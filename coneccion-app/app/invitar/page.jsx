@@ -56,39 +56,41 @@ export default function InvitarPage() {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setSuccess('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
+  setSuccess('')
 
-    // Validar email
-    if (!validarEmail(formData.email)) {
-      setError('Por favor ingresa un email válido')
-      setLoading(false)
-      return
+  // Validar email
+  if (!validarEmail(formData.email)) {
+    setError('Por favor ingresa un email válido')
+    setLoading(false)
+    return
+  }
+
+  try {
+    // Llamar a la API route
+    const response = await fetch('/api/invitar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        ninoId: formData.ninoId,
+        rol: formData.rol,
+        permisos: formData.permisos,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al enviar invitación')
     }
 
-    const supabase = createClient()
-
-    // Verificar si el usuario ya existe
-    const { data: existingUser } = await supabase
-      .from('perfiles')
-      .select('id')
-      .eq('id', formData.email)
-      .single()
-
-    // Nota: En producción, necesitarás configurar un webhook o función serverless
-    // para enviar invitaciones por email usando Supabase Auth Admin API
-    // Por ahora, este es un placeholder que muestra el flujo
-
-    // Agregar al equipo (si el usuario ya existe)
-    // En producción, esto se haría después de que el usuario acepte la invitación
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Por ahora, solo mostrar un mensaje de éxito
-    // En producción real, aquí enviarías el email de invitación
-    setSuccess(`Invitación enviada a ${formData.email}. Una vez que acepte, será agregado al equipo.`)
+    // Éxito
+    setSuccess(`✅ Invitación enviada a ${formData.email}. Recibirá un correo para unirse al equipo.`)
     
     // Limpiar formulario
     setFormData({
@@ -98,8 +100,12 @@ export default function InvitarPage() {
       permisos: 'edicion',
     })
 
+  } catch (err) {
+    setError(err.message || 'Error al enviar la invitación')
+  } finally {
     setLoading(false)
   }
+}
 
   if (loadingNinos) {
     return (
