@@ -74,14 +74,17 @@ export default function RegistroPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <NextImage 
-                src="/logoPulsoAzul.png" 
-                alt="Pulso Azul" 
-                width={200} 
-                height={200}
-                className="object-contain"
-              />
-              <span className="text-2xl font-bold text-slate-900">Conección</span>
+              <div className="flex items-center gap-2">
+                <NextImage 
+                  src="/pulsoAzulLogo.png" 
+                  alt="Pulso Azul" 
+                  width={120} 
+                  height={40}
+                  className="object-contain"
+                />
+                {/* Puedes quitar el texto "Pulso Azul" si ya está en el logo */}
+              </div>
+              <span className="text-2xl font-bold text-slate-900">Pulso Azul</span>
             </Link>
             <h1 className="text-2xl font-bold text-slate-900 mt-4">Crear cuenta</h1>
             <p className="text-slate-600 mt-2">Comienza gratis hoy</p>
