@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
+import NextImage from 'next/image'
 
 export default function HomePage() {
   return (

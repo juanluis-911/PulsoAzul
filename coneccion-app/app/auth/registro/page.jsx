@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import NextImage from 'next/image'  // ← Cambiar
 
 export default function RegistroPage() {
   const router = useRouter()
@@ -73,9 +74,13 @@ export default function RegistroPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">C</span>
-              </div>
+              <NextImage 
+                src="/logoPulsoAzul.png" 
+                alt="Pulso Azul" 
+                width={200} 
+                height={200}
+                className="object-contain"
+              />
               <span className="text-2xl font-bold text-slate-900">Conección</span>
             </Link>
             <h1 className="text-2xl font-bold text-slate-900 mt-4">Crear cuenta</h1>

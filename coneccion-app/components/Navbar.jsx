@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Home, FileText, TrendingUp, UserPlus, User, LogOut, Menu, X } from 'lucide-react'
+import NextImage from 'next/image'  // ← Cambiar
 
 export function Navbar({ user }) {
   const router = useRouter()
@@ -31,10 +32,18 @@ export function Navbar({ user }) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">C</span>
+             {/* El logo cambia de tamaño según el dispositivo */}
+              <div className="flex items-center gap-2">
+              <NextImage 
+                src="/pulsoAzulLogo.png" 
+                alt="Pulso Azul" 
+                width={120} 
+                height={40}
+                className="object-contain"
+              />
+              {/* Puedes quitar el texto "Pulso Azul" si ya está en el logo */}
             </div>
-            <span className="text-xl font-bold text-slate-900 hidden sm:block">Conección</span>
+            <span className="text-xl font-bold text-slate-900 hidden sm:block">Pulso Azul</span>
           </Link>
 
           {/* Desktop Navigation */}

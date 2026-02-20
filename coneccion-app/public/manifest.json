@@ -1,11 +1,11 @@
 {
-  "name": "Conección - App para familias con niños especiales",
-  "short_name": "Conección",
+  "name": "Pulso Azul - App para familias con niños especiales",
+  "short_name": "Pulso Azul",
   "description": "Plataforma para comunicación entre padres, maestras sombra y terapeutas",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0ea5e9",
+  "theme_color": "#0284c7",
   "orientation": "portrait-primary",
   "icons": [
     {
