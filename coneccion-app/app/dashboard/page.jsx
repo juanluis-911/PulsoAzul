@@ -13,16 +13,15 @@ export default async function DashboardPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) redirect('/auth/login')
 
-  // ✅ Obtener perfil con rol_principal
+  // ✅ .maybeSingle() no lanza error si no existe el perfil
   const { data: perfil } = await supabase
     .from('perfiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   const rol = perfil?.rol_principal || 'padre'
 
-  // ✅ Buscar niños según el rol
   let ninos = []
 
   if (rol === 'padre') {
@@ -33,7 +32,6 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
     ninos = data || []
   } else {
-    // Para terapeuta y maestra_sombra: buscar vía equipo_terapeutico
     const { data, error } = await supabase
       .from('equipo_terapeutico')
       .select(`
@@ -42,14 +40,11 @@ export default async function DashboardPage() {
         ninos (*)
       `)
       .eq('usuario_id', user.id)
-      .eq('estado', 'activo')
 
     if (error) console.error('Error obteniendo equipo:', error)
-    
     ninos = data?.map(e => e.ninos).filter(Boolean) || []
   }
 
-  // Registros recientes (igual que antes)
   const { data: registrosRecientes } = await supabase
     .from('registros_diarios')
     .select(`*, ninos (nombre, apellido)`)
@@ -57,7 +52,6 @@ export default async function DashboardPage() {
     .order('fecha', { ascending: false })
     .limit(5)
 
-  // ✅ Etiqueta del rol para el saludo
   const etiquetaRol = {
     padre: 'Padre',
     maestra_sombra: 'Maestra',
@@ -65,9 +59,11 @@ export default async function DashboardPage() {
   }[rol] || 'Usuario'
 
   const saludo = obtenerSaludo()
-  const nombreMostrar = perfil?.nombre_completo?.split(' ')[0] 
-    || user.user_metadata?.nombre_completo?.split(' ')[0] 
-    || etiquetaRol  // ✅ fallback con el rol real
+
+  // ✅ nombreMostrar se usa consistentemente en el saludo
+  const nombreMostrar = perfil?.nombre_completo?.split(' ')[0]
+    || user.user_metadata?.nombre_completo?.split(' ')[0]
+    || etiquetaRol
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,8 +71,9 @@ export default async function DashboardPage() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
+          {/* ✅ Usa nombreMostrar, no user.user_metadata directo */}
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            {saludo}, {user.user_metadata?.nombre_completo?.split(' ')[0] || 'Padre'}
+            {saludo}, {nombreMostrar}
           </h1>
           <p className="text-slate-600">
             {rol === 'padre'
@@ -121,28 +118,31 @@ export default async function DashboardPage() {
           </Link>
 
           {rol === 'padre' && (
-          <Link href="/invitar">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
-                  <Users className="w-6 h-6 text-green-600" />
-                </div>
-                <h3 className="font-semibold text-slate-900">Invitar equipo</h3>
-                <p className="text-sm text-slate-600 text-center mt-1">
-                  Agrega maestras y terapeutas
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
+            <Link href="/invitar">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                    <Users className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900">Invitar equipo</h3>
+                  <p className="text-sm text-slate-600 text-center mt-1">
+                    Agrega maestras y terapeutas
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Mis niños */}
+          {/* Mis niños / Niños asignados */}
           <Card>
             <CardHeader>
-              <CardTitle>Mis niños</CardTitle>
-              <CardDescription>Perfiles registrados</CardDescription>
+              {/* ✅ Título según rol */}
+              <CardTitle>{rol === 'padre' ? 'Mis niños' : 'Niños asignados'}</CardTitle>
+              <CardDescription>
+                {rol === 'padre' ? 'Perfiles registrados' : 'Niños en tu seguimiento'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {ninos && ninos.length > 0 ? (
@@ -164,13 +164,23 @@ export default async function DashboardPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-slate-600 mb-4">No hay niños registrados aún</p>
-                  <Link href="/nino/nuevo">
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Agregar niño
-                    </Button>
-                  </Link>
+                  {rol === 'padre' ? (
+                    // ✅ Solo el padre ve el botón para agregar niños
+                    <>
+                      <p className="text-slate-600 mb-4">No hay niños registrados aún</p>
+                      <Link href="/nino/nuevo">
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar niño
+                        </Button>
+                      </Link>
+                    </>
+                  ) : (
+                    // ✅ Terapeuta/maestra ven mensaje informativo
+                    <p className="text-slate-600">
+                      Aún no tienes niños asignados. El padre o tutor debe invitarte desde su cuenta.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
