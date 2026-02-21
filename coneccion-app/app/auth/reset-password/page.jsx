@@ -21,34 +21,47 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const init = async () => {
-      // ✅ Caso PKCE: Supabase redirige con ?code=... en la URL
+      // 🔴 CORRECCIÓN: Supabase usa 'token' en lugar de 'code' para PKCE
       const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
+      const token = params.get('token')
+      const type = params.get('type')
 
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
+      console.log('Parámetros de URL:', { token, type }) // Para debugging
+
+      if (token && type === 'recovery') {
+        // 🔴 CORRECCIÓN: Para PKCE necesitas intercambiar el token por sesión
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery'
+        })
+
         if (error) {
-          console.error('Error intercambiando código:', error)
+          console.error('Error verificando token:', error)
           setEnlaceExpirado(true)
           return
         }
-        setSesionLista(true)
+        
+        // Verificar que la sesión se estableció correctamente
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setSesionLista(true)
+        } else {
+          setEnlaceExpirado(true)
+        }
         return
       }
 
-      // Fallback: token en hash (flujo legacy)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') {
+      // Fallback: Si no hay token en query params, revisar hash (flujo legacy)
+      if (window.location.hash?.includes('access_token')) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        if (hashParams.get('type') === 'recovery') {
           setSesionLista(true)
+          return
         }
-      })
-
-      // Si no hay ni code ni hash, el enlace es inválido
-      if (!window.location.hash?.includes('access_token')) {
-        setEnlaceExpirado(true)
       }
 
-      return () => subscription.unsubscribe()
+      // Si no hay ningún método válido, el enlace es inválido
+      setEnlaceExpirado(true)
     }
 
     init()
@@ -82,7 +95,7 @@ export default function ResetPasswordPage() {
     setLoading(false)
   }
 
-  // Enlace inválido o expirado
+  // El resto del JSX se mantiene igual...
   if (enlaceExpirado) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
@@ -111,7 +124,6 @@ export default function ResetPasswordPage() {
     )
   }
 
-  // Procesando el token
   if (!sesionLista) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">

@@ -25,7 +25,7 @@ export default function RecuperarPasswordPage() {
     })
 
     if (error) {
-      setExpirado(true)  
+      setError(error.message)
     } else {
       setEnviado(true)
     }
