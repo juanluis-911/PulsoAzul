@@ -4,10 +4,17 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+const LABELS_ROL = {
+  padre: 'Padre/Madre',
+  maestra_sombra: 'Maestra Sombra',
+  terapeuta: 'Terapeuta',
+}
+
 export default function CompleteProfile() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [user, setUser] = useState(null)
+  const [rolAsignado, setRolAsignado] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -17,24 +24,29 @@ export default function CompleteProfile() {
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
-    if (user) {
-      // Verificar si ya tiene perfil completo
-      const { data: profile } = await supabase
-        .from('perfiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
 
-      if (profile?.nombre_completo && profile?.rol_principal) {
-        // Si ya tiene perfil completo, redirigir al dashboard
-        router.push('/dashboard')
-      } else {
-        setUser(user)
-      }
-    } else {
+    if (!user) {
       router.push('/auth/login')
+      return
     }
+
+    // ✅ .maybeSingle() no lanza error si no existe el perfil
+    const { data: profile } = await supabase
+      .from('perfiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile?.nombre_completo && profile?.rol_principal) {
+      router.push('/dashboard')
+      return
+    }
+
+    setUser(user)
+
+    // ✅ El rol viene en los metadatos de la invitación
+    const rolFromMeta = user.user_metadata?.rol || user.user_metadata?.rol_principal || ''
+    setRolAsignado(rolFromMeta)
   }
 
   const handleSubmit = async (e) => {
@@ -43,36 +55,32 @@ export default function CompleteProfile() {
     setMessage({ type: '', text: '' })
 
     const formData = new FormData(e.target)
+
     const profileData = {
       id: user.id,
       nombre_completo: formData.get('nombre_completo'),
       telefono: formData.get('telefono'),
-      rol_principal: formData.get('rol_principal')
+      rol_principal: rolAsignado || formData.get('rol_principal'), // ✅ usa el asignado
     }
 
     try {
-      // Crear o actualizar el perfil del usuario
       const { error } = await supabase
         .from('perfiles')
         .upsert(profileData)
 
       if (error) throw error
 
-      setMessage({ 
-        type: 'success', 
-        text: 'Perfil completado exitosamente' 
+      // ✅ Actualizar también user_metadata para consistencia
+      await supabase.auth.updateUser({
+        data: { nombre_completo: profileData.nombre_completo }
       })
 
-      // Redirigir al dashboard después de 1 segundo
-      setTimeout(() => {
-        router.push('/dashboard?welcome=true')
-      }, 1000)
+      setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
+
+      setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
 
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Error al guardar el perfil: ' + error.message 
-      })
+      setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
     } finally {
       setLoading(false)
     }
@@ -97,23 +105,20 @@ export default function CompleteProfile() {
             Completa tu perfil
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Bienvenido a Pulso Azul. Por favor completa tu información para continuar
+            Bienvenido a Pulso Azul. Por favor completa tu información para continuar.
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
-                id="email"
-                name="email"
                 type="email"
                 value={user.email}
                 disabled
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
               />
             </div>
 
@@ -126,7 +131,7 @@ export default function CompleteProfile() {
                 name="nombre_completo"
                 type="text"
                 required
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ej: Juan Pérez"
               />
             </div>
@@ -139,48 +144,53 @@ export default function CompleteProfile() {
                 id="telefono"
                 name="telefono"
                 type="tel"
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ej: +52 123 456 7890"
               />
             </div>
 
+            {/* ✅ Rol: si viene de invitación se muestra fijo, si no se elige */}
             <div>
-              <label htmlFor="rol_principal" className="block text-sm font-medium text-gray-700">
-                Rol principal
-              </label>
-              <select
-                id="rol_principal"
-                name="rol_principal"
-                required
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                <option value="">Selecciona un rol</option>
-                <option value="padre">Padre/Madre</option>
-                <option value="maestra_sombra">Maestra Sombra</option>
-                <option value="terapeuta">Terapeuta</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700">Rol</label>
+              {rolAsignado ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="block w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-100 text-gray-700">
+                    {LABELS_ROL[rolAsignado] || rolAsignado}
+                  </span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">Asignado por invitación</span>
+                </div>
+              ) : (
+                <select
+                  id="rol_principal"
+                  name="rol_principal"
+                  required
+                  className="mt-1 block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Selecciona un rol</option>
+                  <option value="padre">Padre/Madre</option>
+                  <option value="maestra_sombra">Maestra Sombra</option>
+                  <option value="terapeuta">Terapeuta</option>
+                </select>
+              )}
             </div>
+
           </div>
 
           {message.text && (
             <div className={`text-sm text-center p-2 rounded ${
-              message.type === 'error' 
-                ? 'text-red-700 bg-red-100' 
-                : 'text-green-700 bg-green-100'
+              message.type === 'error' ? 'text-red-700 bg-red-100' : 'text-green-700 bg-green-100'
             }`}>
               {message.text}
             </div>
           )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Guardando...' : 'Completar registro'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Guardando...' : 'Completar registro'}
+          </button>
         </form>
       </div>
     </div>

@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Cliente admin de Supabase (con Service Role Key)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY, // ← Esta es nueva, la agregaremos
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
   {
     auth: {
       autoRefreshToken: false,
@@ -17,7 +16,6 @@ export async function POST(request) {
   try {
     const { email, ninoId, rol, permisos } = await request.json()
 
-    // Validar datos
     if (!email || !ninoId || !rol || !permisos) {
       return NextResponse.json(
         { error: 'Faltan datos requeridos' },
@@ -25,7 +23,6 @@ export async function POST(request) {
       )
     }
 
-    // Invitar usuario por email
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -33,6 +30,7 @@ export async function POST(request) {
           nino_id: ninoId,
           rol: rol,
           permisos: permisos,
+          rol_principal: rol, // ✅ Agregado: lo usamos en complete-profile
         },
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
       }
@@ -40,26 +38,24 @@ export async function POST(request) {
 
     if (inviteError) {
       console.error('Error invitando usuario:', inviteError)
-      return NextResponse.json(
-        { error: inviteError.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: inviteError.message }, { status: 500 })
     }
 
-    // Agregar al equipo terapéutico
+    // ✅ Insertar en equipo_terapeutico solo si no existe ya
     const { error: equipoError } = await supabaseAdmin
       .from('equipo_terapeutico')
-      .insert({
-        nino_id: ninoId,
-        usuario_id: inviteData.user.id,
-        rol: rol,
-        permisos: permisos,
-      })
+      .upsert(
+        {
+          nino_id: ninoId,
+          usuario_id: inviteData.user.id,
+          rol: rol,
+          permisos: permisos,
+        },
+        { onConflict: 'nino_id, usuario_id' } // evita duplicados si se reinvita
+      )
 
     if (equipoError) {
       console.error('Error agregando al equipo:', equipoError)
-      // No retornamos error porque el usuario ya fue invitado
-      // Se agregará al equipo cuando acepte
     }
 
     return NextResponse.json({

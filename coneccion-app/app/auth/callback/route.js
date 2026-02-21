@@ -3,57 +3,49 @@ import { NextResponse } from 'next/server'
 
 export async function GET(request) {
   const requestUrl = new URL(request.url)
-  const token = requestUrl.searchParams.get('token')
-  const type = requestUrl.searchParams.get('type')
   const code = requestUrl.searchParams.get('code')
   const next = requestUrl.searchParams.get('next') || '/dashboard'
-  
+
+  // ✅ CORRECCIÓN: Supabase envía 'token_hash', no 'token'
+  const token_hash = requestUrl.searchParams.get('token_hash')
+  const type = requestUrl.searchParams.get('type')
+
   const supabase = await createClient()
 
-  // Caso 1: Es una invitación (token y type=invite)
-  if (token && type === 'invite') {
-    try {
-      // Verificar el token de invitación
-      const { data, error } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'invite'
-      })
+  // Caso 1: Invitación (token_hash + type=invite)
+  if (token_hash && type === 'invite') {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash,  // ✅ nombre correcto
+      type: 'invite'
+    })
 
-      if (error) {
-        console.error('Error verificando invitación:', error)
-        return NextResponse.redirect(
-          new URL('/auth/login?error=invalid_invite', requestUrl.origin)
-        )
-      }
-
-      // Si la verificación es exitosa, el usuario necesita establecer su contraseña
-      // Redirigir a la página para completar el perfil
+    if (error) {
+      console.error('Error verificando invitación:', error)
       return NextResponse.redirect(
-        new URL('/auth/complete-profile', requestUrl.origin)
-      )
-    } catch (error) {
-      console.error('Error procesando invitación:', error)
-      return NextResponse.redirect(
-        new URL('/auth/login?error=invite_error', requestUrl.origin)
+        new URL(`/auth/login?error=invalid_invite`, requestUrl.origin)
       )
     }
+
+    // ✅ Redirigir a completar perfil (establecer contraseña y nombre)
+    return NextResponse.redirect(
+      new URL('/auth/complete-profile', requestUrl.origin)
+    )
   }
-  
-  // Caso 2: Es un callback normal de OAuth (código de autorización)
+
+  // Caso 2: OAuth o magic link (code)
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (error) {
-      console.error('Error en callback:', error)
+      console.error('Error en callback OAuth:', error)
       return NextResponse.redirect(
         new URL('/auth/login?error=callback_error', requestUrl.origin)
       )
     }
-    
-    // Redirigir al dashboard
+
     return NextResponse.redirect(new URL(next, requestUrl.origin))
   }
 
-  // Si no hay ni token ni código, redirigir al login
+  // Fallback
   return NextResponse.redirect(new URL('/auth/login', requestUrl.origin))
 }
