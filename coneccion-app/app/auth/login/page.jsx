@@ -21,11 +21,16 @@ export default function LoginPage() {
     const processAuthCallback = async () => {
       console.log('URL actual:', window.location.href)
       console.log('Hash:', window.location.hash)
-      
+
       // Verificar si hay un fragmento con token
       if (window.location.hash && window.location.hash.includes('access_token')) {
         console.log('Token detectado, procesando...')
         
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        if (hashParams.get('type') === 'recovery') {
+          router.push('/auth/reset-password' + window.location.hash)
+          return
+        }
         try {
           // Método 1: Intentar con getSession (más confiable)
           const { data: { session }, error: sessionError } = await supabase.auth.getSession()
