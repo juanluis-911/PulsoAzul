@@ -21,28 +21,36 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const init = async () => {
+      console.log('URL completa:', window.location.href)
+      console.log('Search params:', window.location.search)
+      console.log('Hash:', window.location.hash)
+
       // 🔴 CORRECCIÓN: Supabase usa 'token' en lugar de 'code' para PKCE
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
       const type = params.get('type')
 
+
       console.log('Parámetros de URL:', { token, type }) // Para debugging
 
       if (token && type === 'recovery') {
+        console.log('Intentando verificar OTP...')
         // 🔴 CORRECCIÓN: Para PKCE necesitas intercambiar el token por sesión
         const { error } = await supabase.auth.verifyOtp({
           token_hash: token,
           type: 'recovery'
         })
-
+        console.log('Resultado verifyOtp:', { error, data })
         if (error) {
           console.error('Error verificando token:', error)
           setEnlaceExpirado(true)
           return
         }
         
+        
         // Verificar que la sesión se estableció correctamente
         const { data: { session } } = await supabase.auth.getSession()
+        console.log('Sesión después de verifyOtp:', { session, sessionError })
         if (session) {
           setSesionLista(true)
         } else {
