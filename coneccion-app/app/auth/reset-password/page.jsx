@@ -15,6 +15,7 @@ export default function ResetPasswordPage() {
   const [listo, setListo] = useState(false)
   const [error, setError] = useState('')
   const [sesionLista, setSesionLista] = useState(false)
+  const [enlaceExpirado, setEnlaceExpirado] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -27,19 +28,25 @@ export default function ResetPasswordPage() {
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (error) {
-          setError('El enlace es inválido o ya expiró. Solicita uno nuevo.')
+          console.error('Error intercambiando código:', error)
+          setEnlaceExpirado(true)
           return
         }
         setSesionLista(true)
         return
       }
 
-      // Caso legacy: token en hash (fallback por si acaso)
+      // Fallback: token en hash (flujo legacy)
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'PASSWORD_RECOVERY') {
           setSesionLista(true)
         }
       })
+
+      // Si no hay ni code ni hash, el enlace es inválido
+      if (!window.location.hash?.includes('access_token')) {
+        setEnlaceExpirado(true)
+      }
 
       return () => subscription.unsubscribe()
     }
@@ -69,14 +76,42 @@ export default function ResetPasswordPage() {
       setError('No se pudo actualizar la contraseña: ' + error.message)
     } else {
       setListo(true)
-      // Redirigir al dashboard después de 2 segundos
       setTimeout(() => router.push('/dashboard'), 2000)
     }
 
     setLoading(false)
   }
 
-  // Mientras Supabase procesa el token del hash
+  // Enlace inválido o expirado
+  if (enlaceExpirado) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-slate-900">Enlace inválido o expirado</h2>
+            <p className="text-slate-600 text-sm">
+              Este enlace ya fue usado o ha expirado. Solicita uno nuevo para restablecer tu contraseña.
+            </p>
+            <Link href="/auth/recuperar-password">
+              <Button className="w-full">
+                Solicitar nuevo enlace
+              </Button>
+            </Link>
+            <Link href="/auth/login" className="block text-sm text-slate-500 hover:text-slate-700">
+              Volver al inicio de sesión
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Procesando el token
   if (!sesionLista) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
