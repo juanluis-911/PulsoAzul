@@ -19,15 +19,32 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Supabase procesa el token del hash automáticamente y dispara este evento
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // La sesión de recuperación está activa, el usuario puede cambiar su contraseña
-        setSesionLista(true)
-      }
-    })
+    const init = async () => {
+      // ✅ Caso PKCE: Supabase redirige con ?code=... en la URL
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
 
-    return () => subscription.unsubscribe()
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          setError('El enlace es inválido o ya expiró. Solicita uno nuevo.')
+          return
+        }
+        setSesionLista(true)
+        return
+      }
+
+      // Caso legacy: token en hash (fallback por si acaso)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setSesionLista(true)
+        }
+      })
+
+      return () => subscription.unsubscribe()
+    }
+
+    init()
   }, [supabase])
 
   const handleSubmit = async (e) => {

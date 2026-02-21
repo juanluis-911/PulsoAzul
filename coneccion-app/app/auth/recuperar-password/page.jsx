@@ -1,35 +1,74 @@
-'use client'
+// reset-password actualizado
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
-export default function RecuperarPasswordPage() {
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
+  const [password, setPassword] = useState('')
+  const [confirmar, setConfirmar] = useState('')
   const [loading, setLoading] = useState(false)
-  const [enviado, setEnviado] = useState(false)
+  const [listo, setListo] = useState(false)
   const [error, setError] = useState('')
+  const [sesionLista, setSesionLista] = useState(false)
+  const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Supabase procesa el token del hash automáticamente y dispara este evento
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // La sesión de recuperación está activa, el usuario puede cambiar su contraseña
+        setSesionLista(true)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    })
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (password !== confirmar) {
+      setError('Las contraseñas no coinciden.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError('No se pudo enviar el correo. Verifica que el email sea correcto.')
+      setError('No se pudo actualizar la contraseña: ' + error.message)
     } else {
-      setEnviado(true)
+      setListo(true)
+      // Redirigir al dashboard después de 2 segundos
+      setTimeout(() => router.push('/dashboard'), 2000)
     }
 
     setLoading(false)
+  }
+
+  // Mientras Supabase procesa el token del hash
+  if (!sesionLista) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Verificando enlace...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -48,31 +87,21 @@ export default function RecuperarPasswordPage() {
                 priority
               />
             </Link>
-            <h1 className="text-2xl font-bold text-slate-900">Recuperar contraseña</h1>
-            <p className="text-slate-600 mt-2">
-              Te enviaremos un enlace para restablecer tu contraseña
-            </p>
+            <h1 className="text-2xl font-bold text-slate-900">Nueva contraseña</h1>
+            <p className="text-slate-600 mt-2">Elige una contraseña segura para tu cuenta</p>
           </div>
 
-          {enviado ? (
+          {listo ? (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-lg font-semibold text-slate-900">Correo enviado</h2>
+              <h2 className="text-lg font-semibold text-slate-900">¡Contraseña actualizada!</h2>
               <p className="text-slate-600 text-sm">
-                Revisa tu bandeja de entrada en <strong>{email}</strong> y sigue el enlace para restablecer tu contraseña.
+                Tu contraseña fue cambiada exitosamente. Redirigiendo al dashboard...
               </p>
-              <p className="text-xs text-slate-400">
-                Si no lo ves, revisa tu carpeta de spam.
-              </p>
-              <Link href="/auth/login">
-                <Button variant="outline" className="w-full mt-2">
-                  Volver al inicio de sesión
-                </Button>
-              </Link>
             </div>
           ) : (
             <>
@@ -84,25 +113,29 @@ export default function RecuperarPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  type="email"
-                  label="Correo electrónico"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="password"
+                  label="Nueva contraseña"
+                  placeholder="Mínimo 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+
+                <Input
+                  type="password"
+                  label="Confirmar contraseña"
+                  placeholder="Repite la contraseña"
+                  value={confirmar}
+                  onChange={(e) => setConfirmar(e.target.value)}
                   required
                   disabled={loading}
                 />
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+                  {loading ? 'Guardando...' : 'Guardar nueva contraseña'}
                 </Button>
               </form>
-
-              <div className="mt-6 text-center">
-                <Link href="/auth/login" className="text-sm text-slate-500 hover:text-slate-700">
-                  ← Volver al inicio de sesión
-                </Link>
-              </div>
             </>
           )}
 
