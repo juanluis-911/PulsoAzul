@@ -20,34 +20,14 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    const handleRecovery = async () => {
-      try {
-        const params = new URLSearchParams(window.location.search)
-        const code = params.get('code')
-
-        if (!code) {
-          setEnlaceExpirado(true)
-          setVerificando(false)
-          return
-        }
-
-        // Intercambiar el código por sesión
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        
-        if (error) {
-          console.error('Error:', error)
-          setEnlaceExpirado(true)
-        }
-        
-        setVerificando(false)
-      } catch (error) {
-        console.error('Error:', error)
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         setEnlaceExpirado(true)
-        setVerificando(false)
       }
+      setVerificando(false)
     }
-
-    handleRecovery()
+    checkSession()
   }, [supabase])
 
   const handleSubmit = async (e) => {

@@ -11,7 +11,22 @@ export async function GET(request) {
   const type = requestUrl.searchParams.get('type')
 
   const supabase = await createClient()
+  // Caso: Recovery de contraseña (token_hash + type=recovery)
+  if (token_hash && type === 'recovery') {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash,
+      type: 'recovery'
+    })
 
+    if (error) {
+      console.error('Error verificando recovery:', error)
+      return NextResponse.redirect(
+        new URL(`/auth/recuperar-password?error=expired`, requestUrl.origin)
+      )
+    }
+
+    return NextResponse.redirect(new URL('/auth/reset-password', requestUrl.origin))
+  }
   // Caso 1: Invitación (token_hash + type=invite)
   if (token_hash && type === 'invite') {
     const { error } = await supabase.auth.verifyOtp({
