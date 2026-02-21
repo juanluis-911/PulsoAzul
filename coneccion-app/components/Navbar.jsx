@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { Home, FileText, TrendingUp, UserPlus, User, LogOut, Menu, X } from 'lucide-react'
-import NextImage from 'next/image'  // ← Cambiar
+import { Home, FileText, TrendingUp, UserPlus, LogOut, Menu, X } from 'lucide-react'
 
 export function Navbar({ user }) {
   const router = useRouter()
@@ -31,33 +31,37 @@ export function Navbar({ user }) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
-             {/* El logo cambia de tamaño según el dispositivo */}
-              <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center overflow-hidden">
               <NextImage 
-                src="/pulsoAzulLogo.png" 
+                src="/logoPulsoAzul.png" 
                 alt="Pulso Azul" 
-                width={120} 
-                height={40}
+                width={64} 
+                height={64}
                 className="object-contain"
+                priority
               />
-              {/* Puedes quitar el texto "Pulso Azul" si ya está en el logo */}
             </div>
-            <span className="text-xl font-bold text-slate-900 hidden sm:block">Pulso Azul</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 hidden sm:block">
+              Pulso Azul
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2 text-slate-600 hover:text-primary-600 transition-colors"
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-2 text-slate-600 hover:text-primary-600 transition-colors"
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
           </div>
 
           {/* User Menu */}
@@ -94,17 +98,20 @@ export function Navbar({ user }) {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-slate-200">
             <div className="flex flex-col gap-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"

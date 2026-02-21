@@ -8,7 +8,6 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-16">
         <nav className="flex justify-between items-center mb-20">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
               <div className="flex items-center gap-2">
                 <NextImage 
                   src="/pulsoAzulLogo.png" 
@@ -19,7 +18,6 @@ export default function HomePage() {
                 />
                 {/* Puedes quitar el texto "Pulso Azul" si ya está en el logo */}
               </div>
-            </div>
             <span className="text-2xl font-bold text-slate-900">Pulso Azul</span>
           </div>
           <div className="flex gap-4">
@@ -94,7 +92,7 @@ export default function HomePage() {
         </div>
 
         <footer className="mt-32 pt-8 border-t border-slate-200 text-center text-slate-600">
-          <p>&copy; 2025 Conección. Hecho con ❤️ para familias extraordinarias.</p>
+          <p>&copy; 2025 Pulso. Hecho con ❤️ para familias extraordinarias.</p>
         </footer>
       </div>
     </div>
