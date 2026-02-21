@@ -14,54 +14,40 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [listo, setListo] = useState(false)
   const [error, setError] = useState('')
-  const [sesionLista, setSesionLista] = useState(false)
+  const [verificando, setVerificando] = useState(true)
   const [enlaceExpirado, setEnlaceExpirado] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    const init = async () => {
-      console.log('URL completa:', window.location.href)
-      console.log('Search params:', window.location.search)
-      console.log('Hash:', window.location.hash)
-      
-      const params = new URLSearchParams(window.location.search)
-      // 🔴 IMPORTANTE: Ahora buscamos 'code' no 'token'
-      const code = params.get('code')
-      
-      console.log('Code encontrado:', code)
+    const handleRecovery = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const code = params.get('code')
 
-      if (code) {
-        console.log('Intentando intercambiar code por sesión...')
-        
-        // Intercambiar el code por una sesión
-        const { error, data } = await supabase.auth.exchangeCodeForSession(code)
-
-        console.log('Resultado exchangeCodeForSession:', { error, data })
-
-        if (error) {
-          console.error('Error intercambiando code:', error)
+        if (!code) {
           setEnlaceExpirado(true)
+          setVerificando(false)
           return
         }
+
+        // Intercambiar el código por sesión
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
         
-        // Verificar que la sesión se estableció
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        console.log('Sesión después de exchangeCodeForSession:', { session, sessionError })
-        
-        if (session) {
-          setSesionLista(true)
-        } else {
+        if (error) {
+          console.error('Error:', error)
           setEnlaceExpirado(true)
         }
-        return
+        
+        setVerificando(false)
+      } catch (error) {
+        console.error('Error:', error)
+        setEnlaceExpirado(true)
+        setVerificando(false)
       }
-
-      // Si llegamos aquí, no hay code válido
-      setEnlaceExpirado(true)
     }
 
-    init()
+    handleRecovery()
   }, [supabase])
 
   const handleSubmit = async (e) => {
@@ -92,7 +78,17 @@ export default function ResetPasswordPage() {
     setLoading(false)
   }
 
-  // El resto del JSX se mantiene igual...
+  if (verificando) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Verificando enlace...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (enlaceExpirado) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
@@ -121,17 +117,7 @@ export default function ResetPasswordPage() {
     )
   }
 
-  if (!sesionLista) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Verificando enlace...</p>
-        </div>
-      </div>
-    )
-  }
-
+  // El resto del JSX igual...
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
