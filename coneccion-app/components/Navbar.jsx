@@ -34,7 +34,7 @@ export function Navbar({ user }) {
           <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3">
             <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center overflow-hidden">
               <NextImage 
-                src="/logoPulsoAzul.png" 
+                src="/pulsoAzulLogo.png" 
                 alt="Pulso Azul" 
                 width={64} 
                 height={64}
