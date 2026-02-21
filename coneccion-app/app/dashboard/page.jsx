@@ -41,6 +41,13 @@ export default async function DashboardPage() {
       `)
       .eq('usuario_id', user.id)
 
+    console.log('Query equipo_terapeutico:')
+    console.log('  → data:', JSON.stringify(data, null, 2))
+    console.log('  → error:', error)
+    console.log('  → SQL equivalente:')
+    console.log(`     SELECT nino_id, rol, estado, ninos.* FROM equipo_terapeutico`)
+    console.log(`     JOIN ninos ON ninos.id = equipo_terapeutico.nino_id`)
+    console.log(`     WHERE usuario_id = '${user.id}'`)
     if (error) console.error('Error obteniendo equipo:', error)
     ninos = data?.map(e => e.ninos).filter(Boolean) || []
   }
