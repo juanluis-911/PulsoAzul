@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   const nombreMostrar = perfil?.nombre_completo?.split(' ')[0]
     || user.user_metadata?.nombre_completo?.split(' ')[0]
     || etiquetaRol
-
+  console.log('perfil: '+perfil);
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar user={user} />
