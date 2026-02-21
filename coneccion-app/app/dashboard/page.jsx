@@ -34,11 +34,18 @@ export default async function DashboardPage() {
     ninos = data || []
   } else {
     // Para terapeuta y maestra_sombra: buscar vía equipo_terapeutico
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('equipo_terapeutico')
-      .select('ninos(*)')
+      .select(`
+        nino_id,
+        rol,
+        ninos (*)
+      `)
       .eq('usuario_id', user.id)
-      .eq('estado', 'activo') // si tienes este campo
+      .eq('estado', 'activo')
+
+    if (error) console.error('Error obteniendo equipo:', error)
+    
     ninos = data?.map(e => e.ninos).filter(Boolean) || []
   }
 

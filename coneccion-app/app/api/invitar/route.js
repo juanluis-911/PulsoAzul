@@ -50,6 +50,7 @@ export async function POST(request) {
           usuario_id: inviteData.user.id,
           rol: rol,
           permisos: permisos,
+          estado: 'activo',
         },
         { onConflict: 'nino_id, usuario_id' } // evita duplicados si se reinvita
       )
