@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Plus, Users, FileText, TrendingUp } from 'lucide-react'
 import { obtenerSaludo, formatearFecha, ESTADOS_ANIMO } from '@/lib/utils'
+import { RegistroCard } from '@/components/RegistroCard'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -13,7 +14,6 @@ export default async function DashboardPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) redirect('/auth/login')
 
-  // ✅ .maybeSingle() no lanza error si no existe el perfil
   const { data: perfil } = await supabase
     .from('perfiles')
     .select('*')
@@ -34,51 +34,36 @@ export default async function DashboardPage() {
   } else {
     const { data, error } = await supabase
       .from('equipo_terapeutico')
-      .select(`
-        nino_id,
-        rol,
-        ninos (*)
-      `)
+      .select('nino_id, rol, ninos (*)')
       .eq('usuario_id', user.id)
-
-    console.log('Query equipo_terapeutico:')
-    console.log('  → data:', JSON.stringify(data, null, 2))
-    console.log('  → error:', error)
-    console.log('  → SQL equivalente:')
-    console.log(`     SELECT nino_id, rol, estado, ninos.* FROM equipo_terapeutico`)
-    console.log(`     JOIN ninos ON ninos.id = equipo_terapeutico.nino_id`)
-    console.log(`     WHERE usuario_id = '${user.id}'`)
     if (error) console.error('Error obteniendo equipo:', error)
     ninos = data?.map(e => e.ninos).filter(Boolean) || []
   }
 
+  // ✅ Traemos también el perfil de quien creó el registro y su rol en el equipo
   const { data: registrosRecientes } = await supabase
     .from('registros_diarios')
-    .select(`*, ninos (nombre, apellido)`)
+    .select(`
+      *,
+      ninos (nombre, apellido),
+      perfiles!creado_por (nombre_completo, rol_principal)
+    `)
     .in('nino_id', ninos.map(n => n.id))
     .order('fecha', { ascending: false })
     .limit(5)
 
-  const etiquetaRol = {
-    padre: 'Padre',
-    maestra_sombra: 'Maestra',
-    terapeuta: 'Terapeuta',
-  }[rol] || 'Usuario'
-
+  const etiquetaRol = { padre: 'Padre', maestra_sombra: 'Maestra', terapeuta: 'Terapeuta' }[rol] || 'Usuario'
   const saludo = obtenerSaludo()
-
-  // ✅ nombreMostrar se usa consistentemente en el saludo
   const nombreMostrar = perfil?.nombre_completo?.split(' ')[0]
     || user.user_metadata?.nombre_completo?.split(' ')[0]
     || etiquetaRol
-  console.log('perfil: '+perfil);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar user={user} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          {/* ✅ Usa nombreMostrar, no user.user_metadata directo */}
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             {saludo}, {nombreMostrar}
           </h1>
@@ -102,9 +87,7 @@ export default async function DashboardPage() {
                     <Plus className="w-6 h-6 text-white" />
                   </div>
                   <h3 className="font-semibold text-slate-900">Agregar niño</h3>
-                  <p className="text-sm text-slate-600 text-center mt-1">
-                    Crea el perfil de tu hijo
-                  </p>
+                  <p className="text-sm text-slate-600 text-center mt-1">Crea el perfil de tu hijo</p>
                 </CardContent>
               </Card>
             </Link>
@@ -117,9 +100,7 @@ export default async function DashboardPage() {
                   <FileText className="w-6 h-6 text-blue-600" />
                 </div>
                 <h3 className="font-semibold text-slate-900">Nuevo registro</h3>
-                <p className="text-sm text-slate-600 text-center mt-1">
-                  Documenta el día de hoy
-                </p>
+                <p className="text-sm text-slate-600 text-center mt-1">Documenta el día de hoy</p>
               </CardContent>
             </Card>
           </Link>
@@ -132,9 +113,7 @@ export default async function DashboardPage() {
                     <Users className="w-6 h-6 text-green-600" />
                   </div>
                   <h3 className="font-semibold text-slate-900">Invitar equipo</h3>
-                  <p className="text-sm text-slate-600 text-center mt-1">
-                    Agrega maestras y terapeutas
-                  </p>
+                  <p className="text-sm text-slate-600 text-center mt-1">Agrega maestras y terapeutas</p>
                 </CardContent>
               </Card>
             </Link>
@@ -142,14 +121,11 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Mis niños / Niños asignados */}
+          {/* Mis niños */}
           <Card>
             <CardHeader>
-              {/* ✅ Título según rol */}
               <CardTitle>{rol === 'padre' ? 'Mis niños' : 'Niños asignados'}</CardTitle>
-              <CardDescription>
-                {rol === 'padre' ? 'Perfiles registrados' : 'Niños en tu seguimiento'}
-              </CardDescription>
+              <CardDescription>{rol === 'padre' ? 'Perfiles registrados' : 'Niños en tu seguimiento'}</CardDescription>
             </CardHeader>
             <CardContent>
               {ninos && ninos.length > 0 ? (
@@ -160,74 +136,39 @@ export default async function DashboardPage() {
                       href={`/nino/${nino.id}`}
                       className="block p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
                     >
-                      <h4 className="font-semibold text-slate-900">
-                        {nino.nombre} {nino.apellido}
-                      </h4>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {formatearFecha(nino.fecha_nacimiento)}
-                      </p>
+                      <h4 className="font-semibold text-slate-900">{nino.nombre} {nino.apellido}</h4>
+                      <p className="text-sm text-slate-600 mt-1">{formatearFecha(nino.fecha_nacimiento)}</p>
                     </Link>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
                   {rol === 'padre' ? (
-                    // ✅ Solo el padre ve el botón para agregar niños
                     <>
                       <p className="text-slate-600 mb-4">No hay niños registrados aún</p>
                       <Link href="/nino/nuevo">
-                        <Button size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Agregar niño
-                        </Button>
+                        <Button size="sm"><Plus className="w-4 h-4 mr-2" />Agregar niño</Button>
                       </Link>
                     </>
                   ) : (
-                    // ✅ Terapeuta/maestra ven mensaje informativo
-                    <p className="text-slate-600">
-                      Aún no tienes niños asignados. El padre o tutor debe invitarte desde su cuenta.
-                    </p>
+                    <p className="text-slate-600">Aún no tienes niños asignados. El padre o tutor debe invitarte desde su cuenta.</p>
                   )}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Registros recientes */}
+          {/* Actividad reciente — cards mejoradas */}
           <Card>
             <CardHeader>
               <CardTitle>Actividad reciente</CardTitle>
-              <CardDescription>Últimos registros</CardDescription>
+              <CardDescription>Últimos registros del equipo</CardDescription>
             </CardHeader>
             <CardContent>
               {registrosRecientes && registrosRecientes.length > 0 ? (
                 <div className="space-y-3">
                   {registrosRecientes.map((registro) => (
-                    <div
-                      key={registro.id}
-                      className="p-4 bg-slate-50 rounded-lg"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h4 className="font-semibold text-slate-900">
-                            {registro.ninos.nombre} {registro.ninos.apellido}
-                          </h4>
-                          <p className="text-sm text-slate-600">
-                            {formatearFecha(registro.fecha)}
-                          </p>
-                        </div>
-                        {registro.estado_animo && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${ESTADOS_ANIMO[registro.estado_animo].color}`}>
-                            {ESTADOS_ANIMO[registro.estado_animo].emoji} {ESTADOS_ANIMO[registro.estado_animo].label}
-                          </span>
-                        )}
-                      </div>
-                      {registro.logros && (
-                        <p className="text-sm text-slate-700 mt-2">
-                          <strong>Logro:</strong> {registro.logros}
-                        </p>
-                      )}
-                    </div>
+                    <RegistroCard key={registro.id} registro={registro} />
                   ))}
                 </div>
               ) : (
