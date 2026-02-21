@@ -10,32 +10,57 @@ import { obtenerSaludo, formatearFecha, ESTADOS_ANIMO } from '@/lib/utils'
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  // Verificar autenticación
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
-  if (authError || !user) {
-    redirect('/auth/login')
+  if (authError || !user) redirect('/auth/login')
+
+  // ✅ Obtener perfil con rol_principal
+  const { data: perfil } = await supabase
+    .from('perfiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  const rol = perfil?.rol_principal || 'padre'
+
+  // ✅ Buscar niños según el rol
+  let ninos = []
+
+  if (rol === 'padre') {
+    const { data } = await supabase
+      .from('ninos')
+      .select('*')
+      .eq('padre_id', user.id)
+      .order('created_at', { ascending: false })
+    ninos = data || []
+  } else {
+    // Para terapeuta y maestra_sombra: buscar vía equipo_terapeutico
+    const { data } = await supabase
+      .from('equipo_terapeutico')
+      .select('ninos(*)')
+      .eq('usuario_id', user.id)
+      .eq('estado', 'activo') // si tienes este campo
+    ninos = data?.map(e => e.ninos).filter(Boolean) || []
   }
 
-  // Obtener los niños del usuario
-  const { data: ninos, error: ninosError } = await supabase
-    .from('ninos')
-    .select('*')
-    .eq('padre_id', user.id)
-    .order('created_at', { ascending: false })
-
-  // Obtener registros recientes
+  // Registros recientes (igual que antes)
   const { data: registrosRecientes } = await supabase
     .from('registros_diarios')
-    .select(`
-      *,
-      ninos (nombre, apellido)
-    `)
-    .in('nino_id', ninos?.map(n => n.id) || [])
+    .select(`*, ninos (nombre, apellido)`)
+    .in('nino_id', ninos.map(n => n.id))
     .order('fecha', { ascending: false })
     .limit(5)
 
+  // ✅ Etiqueta del rol para el saludo
+  const etiquetaRol = {
+    padre: 'Padre',
+    maestra_sombra: 'Maestra',
+    terapeuta: 'Terapeuta',
+  }[rol] || 'Usuario'
+
   const saludo = obtenerSaludo()
+  const nombreMostrar = perfil?.nombre_completo?.split(' ')[0] 
+    || user.user_metadata?.nombre_completo?.split(' ')[0] 
+    || etiquetaRol  // ✅ fallback con el rol real
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -47,27 +72,32 @@ export default async function DashboardPage() {
             {saludo}, {user.user_metadata?.nombre_completo?.split(' ')[0] || 'Padre'}
           </h1>
           <p className="text-slate-600">
-            {ninos?.length > 0 
-              ? `Tienes ${ninos.length} ${ninos.length === 1 ? 'niño registrado' : 'niños registrados'}`
-              : 'Comienza agregando el perfil de tu hijo'}
+            {rol === 'padre'
+              ? ninos.length > 0
+                ? `Tienes ${ninos.length} ${ninos.length === 1 ? 'niño registrado' : 'niños registrados'}`
+                : 'Comienza agregando el perfil de tu hijo'
+              : `Tienes acceso a ${ninos.length} ${ninos.length === 1 ? 'niño' : 'niños'}`
+            }
           </p>
         </div>
 
         {/* Acciones rápidas */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Link href="/nino/nuevo">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-dashed border-primary-300 bg-primary-50/50">
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center mb-3">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="font-semibold text-slate-900">Agregar niño</h3>
-                <p className="text-sm text-slate-600 text-center mt-1">
-                  Crea el perfil de tu hijo
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
+          {rol === 'padre' && (
+            <Link href="/nino/nuevo">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-dashed border-primary-300 bg-primary-50/50">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center mb-3">
+                    <Plus className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900">Agregar niño</h3>
+                  <p className="text-sm text-slate-600 text-center mt-1">
+                    Crea el perfil de tu hijo
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
           <Link href="/registro-diario">
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -83,6 +113,7 @@ export default async function DashboardPage() {
             </Card>
           </Link>
 
+          {rol === 'padre' && (
           <Link href="/invitar">
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="flex flex-col items-center justify-center py-8">
@@ -96,6 +127,7 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </Link>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
