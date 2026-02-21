@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NextImage from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client' 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
