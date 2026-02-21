@@ -17,50 +17,100 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const supabase = createClient()
 
-  // Efecto para procesar tokens de invitación en el fragmento de la URL
   useEffect(() => {
-    const handleInviteToken = async () => {
-      // Verificar si hay un fragmento con token en la URL
+    const processAuthCallback = async () => {
+      console.log('URL actual:', window.location.href)
+      console.log('Hash:', window.location.hash)
+      
+      // Verificar si hay un fragmento con token
       if (window.location.hash && window.location.hash.includes('access_token')) {
+        console.log('Token detectado, procesando...')
+        
         try {
-          setInitialLoading(true)
+          // Método 1: Intentar con getSession (más confiable)
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
           
-          // Supabase puede procesar automáticamente el fragmento
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (error) throw error
+          if (sessionError) {
+            console.error('Error getSession:', sessionError)
+            throw sessionError
+          }
           
           if (session) {
-            // Verificar si el perfil está completo
+            console.log('Sesión establecida:', session.user.email)
+            
+            // Verificar perfil
             const { data: profile, error: profileError } = await supabase
               .from('perfiles')
               .select('nombre_completo, rol_principal')
               .eq('id', session.user.id)
-              .single()
+              .maybeSingle()
 
-            if (profileError && profileError.code !== 'PGRST116') {
+            if (profileError) {
               console.error('Error verificando perfil:', profileError)
             }
 
-            // Redirigir según el estado del perfil
+            // Redirigir según el perfil
             if (profile?.nombre_completo && profile?.rol_principal) {
               router.push('/dashboard')
             } else {
               router.push('/auth/complete-profile')
             }
+            return
           }
+
+          // Si no hay sesión, intentar método alternativo
+          console.log('No hay sesión, intentando método alternativo...')
+          
+          // Extraer tokens del hash manualmente
+          const hashParams = new URLSearchParams(
+            window.location.hash.substring(1) // Quitar el #
+          )
+          
+          const accessToken = hashParams.get('access_token')
+          const refreshToken = hashParams.get('refresh_token')
+          
+          if (accessToken) {
+            console.log('Tokens encontrados en hash, estableciendo sesión...')
+            
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            })
+            
+            if (error) throw error
+            
+            if (data.session) {
+              // Verificar perfil
+              const { data: profile } = await supabase
+                .from('perfiles')
+                .select('nombre_completo, rol_principal')
+                .eq('id', data.session.user.id)
+                .maybeSingle()
+
+              if (profile?.nombre_completo && profile?.rol_principal) {
+                router.push('/dashboard')
+              } else {
+                router.push('/auth/complete-profile')
+              }
+              return
+            }
+          }
+          
+          // Si llegamos aquí, algo salió mal
+          setError('No se pudo procesar la autenticación automática')
         } catch (error) {
           console.error('Error procesando autenticación:', error)
-          setError('Error al procesar la autenticación. Por favor intenta de nuevo.')
+          setError('Error al procesar la autenticación: ' + error.message)
         } finally {
           setInitialLoading(false)
         }
       } else {
+        console.log('No hay token en la URL')
         setInitialLoading(false)
       }
     }
 
-    handleInviteToken()
+    processAuthCallback()
   }, [router, supabase])
 
   const handleLogin = async (e) => {
@@ -85,7 +135,7 @@ export default function LoginPage() {
         .from('perfiles')
         .select('nombre_completo, rol_principal')
         .eq('id', data.user.id)
-        .single()
+        .maybeSingle()
 
       if (profile?.nombre_completo && profile?.rol_principal) {
         router.push('/dashboard')
@@ -95,18 +145,18 @@ export default function LoginPage() {
       router.refresh()
     } catch (error) {
       console.error('Error verificando perfil:', error)
-      router.push('/dashboard') // Redirigir al dashboard si hay error
+      router.push('/dashboard')
       router.refresh()
     }
   }
 
-  // Mostrar carga inicial mientras procesamos el token
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-slate-600">Procesando autenticación...</p>
+          <p className="text-sm text-slate-400 mt-2">Por favor espera</p>
         </div>
       </div>
     )
@@ -131,6 +181,12 @@ export default function LoginPage() {
             <p className="text-slate-600 mt-2">Bienvenido de vuelta</p>
           </div>
 
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <Input
               type="email"
@@ -152,16 +208,10 @@ export default function LoginPage() {
               disabled={loading}
             />
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || initialLoading}
+              disabled={loading}
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
