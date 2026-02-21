@@ -24,33 +24,31 @@ export default function ResetPasswordPage() {
       console.log('URL completa:', window.location.href)
       console.log('Search params:', window.location.search)
       console.log('Hash:', window.location.hash)
-
-      // 🔴 CORRECCIÓN: Supabase usa 'token' en lugar de 'code' para PKCE
+      
       const params = new URLSearchParams(window.location.search)
-      const token = params.get('token')
-      const type = params.get('type')
+      // 🔴 IMPORTANTE: Ahora buscamos 'code' no 'token'
+      const code = params.get('code')
+      
+      console.log('Code encontrado:', code)
 
+      if (code) {
+        console.log('Intentando intercambiar code por sesión...')
+        
+        // Intercambiar el code por una sesión
+        const { error, data } = await supabase.auth.exchangeCodeForSession(code)
 
-      console.log('Parámetros de URL:', { token, type }) // Para debugging
+        console.log('Resultado exchangeCodeForSession:', { error, data })
 
-      if (token && type === 'recovery') {
-        console.log('Intentando verificar OTP...')
-        // 🔴 CORRECCIÓN: Para PKCE necesitas intercambiar el token por sesión
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: 'recovery'
-        })
-        console.log('Resultado verifyOtp:', { error, data })
         if (error) {
-          console.error('Error verificando token:', error)
+          console.error('Error intercambiando code:', error)
           setEnlaceExpirado(true)
           return
         }
         
+        // Verificar que la sesión se estableció
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('Sesión después de exchangeCodeForSession:', { session, sessionError })
         
-        // Verificar que la sesión se estableció correctamente
-        const { data: { session } } = await supabase.auth.getSession()
-        console.log('Sesión después de verifyOtp:', { session, sessionError })
         if (session) {
           setSesionLista(true)
         } else {
@@ -59,16 +57,7 @@ export default function ResetPasswordPage() {
         return
       }
 
-      // Fallback: Si no hay token en query params, revisar hash (flujo legacy)
-      if (window.location.hash?.includes('access_token')) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        if (hashParams.get('type') === 'recovery') {
-          setSesionLista(true)
-          return
-        }
-      }
-
-      // Si no hay ningún método válido, el enlace es inválido
+      // Si llegamos aquí, no hay code válido
       setEnlaceExpirado(true)
     }
 
