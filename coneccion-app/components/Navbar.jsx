@@ -14,7 +14,7 @@ export function Navbar({ user }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
-  const { estado, activar } = useNotificaciones()
+  const { estado, activar, desactivar } = useNotificaciones()
 
   useEffect(() => {
     const handler = (e) => {
@@ -53,12 +53,17 @@ export function Navbar({ user }) {
   const NotifButton = ({ mobile = false }) => {
     if (estado === 'no-soportado' || estado === 'denegado') return null
 
-    if (estado === 'activo') {
+    if (estado === 'activo' || estado === 'desactivando') {
       return (
-        <span className={`flex items-center gap-1.5 text-sm text-green-600 font-medium ${mobile ? 'px-4 py-2' : ''}`}>
+        <button
+          onClick={desactivar}
+          disabled={estado === 'desactivando'}
+          title="Toca para desactivar"
+          className={`flex items-center gap-1.5 text-sm text-green-600 hover:text-red-500 font-medium transition-colors disabled:opacity-60 ${mobile ? 'px-4 py-2 hover:bg-red-50 rounded-lg w-full' : ''}`}
+        >
           <Bell className="w-4 h-4" />
-          Notificaciones activas
-        </span>
+          {estado === 'desactivando' ? 'Desactivando...' : 'Notificaciones activas'}
+        </button>
       )
     }
 

@@ -28,7 +28,7 @@ export async function POST(request) {
       .from('equipo_terapeutico')
       .select('usuario_id')
       .eq('nino_id', ninoId)
-      .neq('usuario_id', creadoPor)
+      //.neq('usuario_id', creadoPor)
 
     if (eqError) throw eqError
     console.log('Equipo encontrado:', equipo)

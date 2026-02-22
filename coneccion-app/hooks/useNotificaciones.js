@@ -1,9 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { registrarServiceWorker, suscribirAPush } from '@/lib/notifications'
+import { registrarServiceWorker, suscribirAPush, cancelarSuscripcion } from '@/lib/notifications'
 
 export function useNotificaciones() {
-  const [estado, setEstado] = useState('idle') // idle | solicitando | activo | denegado | no-soportado
+  const [estado, setEstado] = useState('idle') // idle | solicitando | activo | denegado | desactivando | no-soportado
 
   useEffect(() => {
     if (!('Notification' in window)) {
@@ -22,5 +22,11 @@ export function useNotificaciones() {
     setEstado(sub ? 'activo' : 'denegado')
   }
 
-  return { estado, activar }
+  async function desactivar() {
+    setEstado('desactivando')
+    await cancelarSuscripcion()
+    setEstado('idle')
+  }
+
+  return { estado, activar, desactivar }
 }
