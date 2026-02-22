@@ -6,13 +6,15 @@ import { useRouter } from 'next/navigation'
 import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { Home, FileText, TrendingUp, UserPlus, LogOut, Menu, X, Users, Download } from 'lucide-react'
+import { Home, FileText, TrendingUp, UserPlus, LogOut, Menu, X, Users, Download, Bell, BellOff } from 'lucide-react'
+import { useNotificaciones } from '@/hooks/useNotificaciones'
 
 export function Navbar({ user }) {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
+  const { estado, activar } = useNotificaciones()
 
   useEffect(() => {
     const handler = (e) => {
@@ -40,12 +42,37 @@ export function Navbar({ user }) {
   }
 
   const navItems = [
-    { href: '/dashboard',       label: 'Inicio',        icon: Home },
+    { href: '/dashboard',       label: 'Inicio',         icon: Home },
     { href: '/registro-diario', label: 'Nuevo Registro', icon: FileText },
-    { href: '/progreso',        label: 'Progreso',      icon: TrendingUp },
-    { href: '/equipo',          label: 'Red de apoyo',  icon: Users },
-    { href: '/invitar',         label: 'Invitar',       icon: UserPlus },
+    { href: '/progreso',        label: 'Progreso',       icon: TrendingUp },
+    { href: '/equipo',          label: 'Red de apoyo',   icon: Users },
+    { href: '/invitar',         label: 'Invitar',        icon: UserPlus },
   ]
+
+  // Botón de notificaciones reutilizable
+  const NotifButton = ({ mobile = false }) => {
+    if (estado === 'no-soportado' || estado === 'denegado') return null
+
+    if (estado === 'activo') {
+      return (
+        <span className={`flex items-center gap-1.5 text-sm text-green-600 font-medium ${mobile ? 'px-4 py-2' : ''}`}>
+          <Bell className="w-4 h-4" />
+          Notificaciones activas
+        </span>
+      )
+    }
+
+    return (
+      <button
+        onClick={activar}
+        disabled={estado === 'solicitando'}
+        className={`flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 font-medium transition-colors disabled:opacity-60 ${mobile ? 'px-4 py-2 hover:bg-purple-50 rounded-lg w-full' : ''}`}
+      >
+        <Bell className="w-4 h-4" />
+        {estado === 'solicitando' ? 'Activando...' : 'Activar notificaciones'}
+      </button>
+    )
+  }
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
@@ -86,6 +113,9 @@ export function Navbar({ user }) {
           {/* User Menu Desktop */}
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-3">
+              {/* Notificaciones push - desktop */}
+              <NotifButton />
+
               {showInstall && (
                 <Button
                   variant="outline"
@@ -134,6 +164,9 @@ export function Navbar({ user }) {
                   <span>{label}</span>
                 </Link>
               ))}
+
+              {/* Notificaciones push - mobile */}
+              <NotifButton mobile />
 
               {showInstall && (
                 <button

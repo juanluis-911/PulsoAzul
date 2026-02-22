@@ -34,18 +34,14 @@ export default function RegistroDiarioPage() {
   const fetchNinos = async () => {
     const supabase = createClient()
     
-    // Obtener niños del usuario actual o del equipo
     const { data: { user } } = await supabase.auth.getUser()
-    
     if (!user) return
 
-    // Primero intentar obtener niños como padre
     let { data: ninosPadre } = await supabase
       .from('ninos')
       .select('*')
       .eq('padre_id', user.id)
 
-    // Luego obtener niños donde el usuario es parte del equipo
     const { data: equipoData } = await supabase
       .from('equipo_terapeutico')
       .select('ninos(*)')
@@ -54,7 +50,6 @@ export default function RegistroDiarioPage() {
 
     const ninosEquipo = equipoData?.map(e => e.ninos) || []
 
-    // Combinar y eliminar duplicados
     const todosNinos = [...(ninosPadre || []), ...ninosEquipo]
     const ninosUnicos = todosNinos.filter((nino, index, self) =>
       index === self.findIndex((n) => n.id === nino.id)
@@ -62,7 +57,6 @@ export default function RegistroDiarioPage() {
 
     setNinos(ninosUnicos)
     
-    // Si solo hay un niño, seleccionarlo automáticamente
     if (ninosUnicos.length === 1) {
       setFormData(prev => ({ ...prev, ninoId: ninosUnicos[0].id }))
     }
@@ -71,10 +65,7 @@ export default function RegistroDiarioPage() {
   }
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
   const handleSubmit = async (e) => {
@@ -84,7 +75,6 @@ export default function RegistroDiarioPage() {
 
     const supabase = createClient()
 
-    // Obtener el usuario actual
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -93,36 +83,47 @@ export default function RegistroDiarioPage() {
       return
     }
 
-    // Convertir actividades de string a array
     const actividadesArray = formData.actividades
       .split(',')
       .map(a => a.trim())
       .filter(a => a.length > 0)
 
     // Insertar el registro
-    const { data, error } = await supabase
+    const { error: insertError } = await supabase
       .from('registros_diarios')
-      .insert([
-        {
-          nino_id: formData.ninoId,
-          fecha: formData.fecha,
-          estado_animo: formData.estadoAnimo || null,
-          actividades: actividadesArray,
-          logros: formData.logros || null,
-          desafios: formData.desafios || null,
-          notas: formData.notas || null,
-          tipo_registro: formData.tipoRegistro,
-          creado_por: user.id,
-        }
-      ])
+      .insert([{
+        nino_id: formData.ninoId,
+        fecha: formData.fecha,
+        estado_animo: formData.estadoAnimo || null,
+        actividades: actividadesArray,
+        logros: formData.logros || null,
+        desafios: formData.desafios || null,
+        notas: formData.notas || null,
+        tipo_registro: formData.tipoRegistro,
+        creado_por: user.id,
+      }])
 
-    if (error) {
-      setError(error.message)
+    if (insertError) {
+      setError(insertError.message)
       setLoading(false)
       return
     }
 
-    // Redirigir al dashboard
+    // Enviar notificación push al resto del equipo (sin bloquear la navegación)
+    const nino = ninos.find(n => n.id === formData.ninoId)
+    if (nino) {
+      fetch('/api/notificar-registro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ninoId: nino.id,
+          nombreNino: nino.nombre,
+          creadoPor: user.id,
+          urlRegistro: `/progreso?nino=${nino.id}`,
+        }),
+      }).catch(err => console.warn('No se pudo enviar notificación:', err))
+    }
+
     router.push('/dashboard')
     router.refresh()
   }
