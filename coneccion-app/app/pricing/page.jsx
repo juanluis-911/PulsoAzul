@@ -1,6 +1,7 @@
+
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -34,11 +35,23 @@ const PLANS = [
   },
 ]
 
-export default function PricingPage() {
-  const router = useRouter()
+// Componente separado que usa useSearchParams
+function CanceledBanner() {
   const searchParams = useSearchParams()
   const canceled = searchParams.get('checkout') === 'canceled'
-  const [loading, setLoading] = useState(null) // id del plan en proceso
+
+  if (!canceled) return null
+
+  return (
+    <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-center">
+      El proceso de pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.
+    </div>
+  )
+}
+
+function PricingContent() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(null)
 
   async function handleSubscribe(planId) {
     setLoading(planId)
@@ -51,7 +64,6 @@ export default function PricingPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        // Si no está autenticado, redirigir al login
         if (res.status === 401) {
           router.push('/auth/login?next=/pricing')
           return
@@ -59,7 +71,6 @@ export default function PricingPage() {
         throw new Error(data.error || 'Error al crear sesión de pago')
       }
 
-      // Redirigir al checkout de Stripe
       window.location.href = data.url
 
     } catch (err) {
@@ -74,7 +85,6 @@ export default function PricingPage() {
     <div className="min-h-screen bg-slate-50 py-16 px-4">
       <div className="max-w-4xl mx-auto">
 
-        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-slate-900 mb-4">
             Planes simples y transparentes
@@ -84,14 +94,11 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Aviso de cancelación */}
-        {canceled && (
-          <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 text-center">
-            El proceso de pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.
-          </div>
-        )}
+        {/* Suspense solo alrededor del banner que necesita useSearchParams */}
+        <Suspense fallback={null}>
+          <CanceledBanner />
+        </Suspense>
 
-        {/* Cards de planes */}
         <div className="grid md:grid-cols-2 gap-8">
           {PLANS.map(plan => (
             <div
@@ -100,7 +107,6 @@ export default function PricingPage() {
                 plan.badge ? 'border-blue-500' : 'border-slate-200'
               }`}
             >
-              {/* Badge */}
               {plan.badge && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-semibold px-4 py-1 rounded-full">
                   {plan.badge}
@@ -143,4 +149,8 @@ export default function PricingPage() {
       </div>
     </div>
   )
+}
+
+export default function PricingPage() {
+  return <PricingContent />
 }
