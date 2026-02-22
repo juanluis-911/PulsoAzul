@@ -5,9 +5,9 @@ import { ChevronDown, School, Heart, Home } from 'lucide-react'
 import { formatearFecha, ESTADOS_ANIMO } from '@/lib/utils'
 
 const TIPO_REGISTRO = {
-  escuela: { label: 'Escuela',  Icon: School, color: 'bg-blue-100 text-blue-700' },
-  terapia: { label: 'Terapia',  Icon: Heart,  color: 'bg-purple-100 text-purple-700' },
-  casa:    { label: 'Casa',     Icon: Home,   color: 'bg-green-100 text-green-700' },
+  escuela: { label: 'Escuela', Icon: School, color: 'bg-blue-100 text-blue-700' },
+  terapia: { label: 'Terapia', Icon: Heart,  color: 'bg-purple-100 text-purple-700' },
+  casa:    { label: 'Casa',    Icon: Home,   color: 'bg-green-100 text-green-700' },
 }
 
 const ETIQUETA_ROL = {
@@ -17,21 +17,21 @@ const ETIQUETA_ROL = {
 }
 
 export function RegistroCard({ registro }) {
+  console.log(registro);
   const [open, setOpen] = useState(false)
 
-  const tipo      = TIPO_REGISTRO[registro.tipo_registro] || TIPO_REGISTRO.escuela
-  const { Icon }  = tipo
-  const autor     = registro.perfiles
-  const rolAutor  = ETIQUETA_ROL[autor?.rol_principal] || ETIQUETA_ROL.padre
-  const nombre    = autor?.nombre_completo?.split(' ')[0] || 'Alguien'
+  const tipo     = TIPO_REGISTRO[registro.tipo_registro] || TIPO_REGISTRO.escuela
+  const { Icon } = tipo
+  const autor    = registro.perfiles
+  const rolAutor = ETIQUETA_ROL[autor?.rol_principal] || ETIQUETA_ROL.padre
+  const nombre   = autor?.nombre_completo?.split(' ')[0] || 'Alguien'
 
-  // ¿Hay contenido extra para mostrar?
   const tieneExtra = registro.desafios || registro.notas || registro.actividades?.length > 0
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
 
-      {/* Franja superior: niño + estado de ánimo */}
+      {/* Cabecera: niño + estado de ánimo */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-100">
         <div>
           <p className="font-semibold text-slate-900 text-sm">
@@ -46,7 +46,7 @@ export function RegistroCard({ registro }) {
         )}
       </div>
 
-      {/* Cuerpo: resumen visible siempre */}
+      {/* Resumen siempre visible */}
       <div className="px-4 py-3 space-y-1">
         {registro.logros && (
           <p className="text-sm text-slate-700">
@@ -60,22 +60,22 @@ export function RegistroCard({ registro }) {
 
       {/* Detalle expandible */}
       {tieneExtra && open && (
-        <div className="px-4 pb-3 space-y-3 border-t border-slate-100 pt-3">
+        <div className="px-4 pb-3 pt-2 space-y-3 border-t border-slate-100">
           {registro.desafios && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">🎯 Desafíos</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">🎯 Desafíos</p>
               <p className="text-sm text-slate-700">{registro.desafios}</p>
             </div>
           )}
-          {registro.notas && registro.logros && (
+          {registro.notas && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">📝 Notas</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">📝 Notas</p>
               <p className="text-sm text-slate-700">{registro.notas}</p>
             </div>
           )}
           {registro.actividades?.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🗂 Actividades</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">🗂 Actividades</p>
               <div className="flex flex-wrap gap-1">
                 {registro.actividades.map((act, i) => (
                   <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs">
@@ -88,7 +88,7 @@ export function RegistroCard({ registro }) {
         </div>
       )}
 
-      {/* Pie: tipo + autor + botón expandir */}
+      {/* Pie: tipo + autor + botón */}
       <div className="flex items-center justify-between px-4 pb-3 pt-1">
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${tipo.color}`}>
