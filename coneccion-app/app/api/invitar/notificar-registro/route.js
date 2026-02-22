@@ -1,18 +1,19 @@
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
-webpush.setVapidDetails(
-  process.env.VAPID_MAILTO,
-  process.env.NEXT_PUBLIC_VAPID_KEY,
-  process.env.VAPID_PRIVATE_KEY
-)
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 export async function POST(request) {
+  // Mover setVapidDetails aquí dentro para que solo se ejecute en runtime
+  webpush.setVapidDetails(
+    process.env.VAPID_MAILTO,
+    process.env.NEXT_PUBLIC_VAPID_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+
   try {
     const { ninoId, nombreNino, creadoPor, urlRegistro } = await request.json()
 
