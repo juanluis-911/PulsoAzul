@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
-import { Home, FileText, TrendingUp, UserPlus, LogOut, Menu, X } from 'lucide-react'
+import { Home, FileText, TrendingUp, UserPlus, LogOut, Menu, X, Users } from 'lucide-react'
 
 export function Navbar({ user }) {
   const router = useRouter()
@@ -20,10 +20,11 @@ export function Navbar({ user }) {
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Inicio', icon: Home },
+    { href: '/dashboard',      label: 'Inicio',        icon: Home },
     { href: '/registro-diario', label: 'Nuevo Registro', icon: FileText },
-    { href: '/progreso', label: 'Progreso', icon: TrendingUp },
-    { href: '/invitar', label: 'Invitar', icon: UserPlus },
+    { href: '/progreso',       label: 'Progreso',      icon: TrendingUp },
+    { href: '/equipo',         label: 'Red de apoyo',  icon: Users },
+    { href: '/invitar',        label: 'Invitar',       icon: UserPlus },
   ]
 
   return (
@@ -33,10 +34,10 @@ export function Navbar({ user }) {
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3">
             <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center overflow-hidden">
-              <NextImage 
-                src="/pulsoAzulLogo.png" 
-                alt="Pulso Azul" 
-                width={64} 
+              <NextImage
+                src="/pulsoAzulLogo.png"
+                alt="Pulso Azul"
+                width={64}
                 height={64}
                 className="object-contain"
                 priority
@@ -73,12 +74,7 @@ export function Navbar({ user }) {
                 </p>
                 <p className="text-xs text-slate-500">Padre/Madre</p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="flex items-center gap-2"
-              >
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="flex items-center gap-2">
                 <LogOut className="w-4 h-4" />
                 Salir
               </Button>
