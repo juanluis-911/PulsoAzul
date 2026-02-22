@@ -11,6 +11,15 @@ function toISO(unixSeconds) {
   return isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+// Extrae current_period_end de una subscription (compatible con API 2024-11+)
+function getPeriodEnd(subscription) {
+  // Versión nueva: viene en cada item
+  const fromItem = subscription.items?.data?.[0]?.current_period_end
+  if (fromItem) return toISO(fromItem)
+  // Versión anterior: viene directo en la subscription
+  return toISO(subscription.current_period_end)
+}
+
 // Cliente admin: bypasea RLS para poder escribir en subscriptions
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -50,13 +59,18 @@ export async function POST(request) {
           break
         }
 
+        // Activar cancelación al final del período pagado
+        await stripe.subscriptions.update(subscription.id, {
+          cancel_at_period_end: true,
+        })
+
         await supabaseAdmin.from('subscriptions').upsert({
           id:                    userId,
           stripe_customer_id:    session.customer,
           stripe_subscription_id: subscription.id,
           status:                'active',
           plan,
-          current_period_end:    toISO(subscription.current_period_end),
+          current_period_end:    getPeriodEnd(subscription),
           cancel_at_period_end:  subscription.cancel_at_period_end,
         })
         break
@@ -92,7 +106,7 @@ export async function POST(request) {
           stripe_subscription_id: invoice.subscription,
           status:                 'active',
           plan,
-          current_period_end:     toISO(subscription.current_period_end),
+          current_period_end:     getPeriodEnd(subscription),
           cancel_at_period_end:   subscription.cancel_at_period_end,
         })
         break
@@ -159,7 +173,7 @@ export async function POST(request) {
         await supabaseAdmin.from('subscriptions').update({
           status:               statusMap[subscription.status] ?? 'past_due',
           plan,
-          current_period_end:   toISO(subscription.current_period_end),
+          current_period_end:   getPeriodEnd(subscription),
           cancel_at_period_end: subscription.cancel_at_period_end,
         }).eq('id', userId)
         break
