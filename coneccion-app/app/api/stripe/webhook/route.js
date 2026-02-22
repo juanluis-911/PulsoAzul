@@ -11,8 +11,8 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// Necesario para que Stripe pueda verificar la firma del webhook
-export const config = { api: { bodyParser: false } }
+// App Router: deshabilitar body parsing para que Stripe pueda verificar la firma
+export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
   const body = await request.text()
@@ -61,15 +61,33 @@ export async function POST(request) {
         if (!invoice.subscription) break
 
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
-        const userId = subscription.metadata?.supabase_user_id
 
-        if (!userId) break
+        // El userId puede venir de la subscription o del invoice (fallback)
+        const userId =
+          subscription.metadata?.supabase_user_id ||
+          invoice.parent?.subscription_details?.metadata?.supabase_user_id ||
+          invoice.subscription_details?.metadata?.supabase_user_id
 
-        await supabaseAdmin.from('subscriptions').update({
-          status:               'active',
-          current_period_end:   new Date(subscription.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: subscription.cancel_at_period_end,
-        }).eq('id', userId)
+        if (!userId) {
+          console.error('[webhook] invoice.payment_succeeded: sin supabase_user_id')
+          break
+        }
+
+        const plan =
+          subscription.metadata?.plan ||
+          invoice.parent?.subscription_details?.metadata?.plan ||
+          'pro_monthly'
+
+        // upsert en lugar de update: crea la fila si no existe todavía
+        await supabaseAdmin.from('subscriptions').upsert({
+          id:                     userId,
+          stripe_customer_id:     invoice.customer,
+          stripe_subscription_id: invoice.subscription,
+          status:                 'active',
+          plan,
+          current_period_end:     new Date(subscription.current_period_end * 1000).toISOString(),
+          cancel_at_period_end:   subscription.cancel_at_period_end,
+        })
         break
       }
 
@@ -79,13 +97,21 @@ export async function POST(request) {
         if (!invoice.subscription) break
 
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
-        const userId = subscription.metadata?.supabase_user_id
+        const userId =
+          subscription.metadata?.supabase_user_id ||
+          invoice.parent?.subscription_details?.metadata?.supabase_user_id
 
-        if (!userId) break
+        if (!userId) {
+          console.error('[webhook] invoice.payment_failed: sin supabase_user_id')
+          break
+        }
 
-        await supabaseAdmin.from('subscriptions').update({
-          status: 'past_due',
-        }).eq('id', userId)
+        await supabaseAdmin.from('subscriptions').upsert({
+          id:                     userId,
+          stripe_customer_id:     invoice.customer,
+          stripe_subscription_id: invoice.subscription,
+          status:                 'past_due',
+        })
         break
       }
 
