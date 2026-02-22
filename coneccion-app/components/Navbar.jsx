@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen 
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -48,11 +48,12 @@ export function Navbar({ user }) {
   }
 
   const navItems = [
-    { href: '/dashboard',       label: 'Inicio',         icon: Home },
-    { href: '/registro-diario', label: 'Nuevo Registro', icon: FileText },
-    { href: '/progreso',        label: 'Progreso',       icon: TrendingUp },
-    { href: '/equipo',          label: 'Red de apoyo',   icon: Users },
-    { href: '/invitar',         label: 'Invitar',        icon: UserPlus },
+    { href: '/dashboard',       label: 'Inicio',            icon: Home },
+    //{ href: '/registro-diario', label: 'Nuevo Registro',    icon: FileText },
+    { href: '/historial',       label: 'Registros Diarios', icon: BookOpen },
+    { href: '/progreso',        label: 'Progreso',          icon: TrendingUp },
+    { href: '/equipo',          label: 'Red de apoyo',      icon: Users },
+    { href: '/invitar',         label: 'Invitar',           icon: UserPlus },
   ]
 
   const displayName = user?.user_metadata?.nombre_completo || user?.email || ''

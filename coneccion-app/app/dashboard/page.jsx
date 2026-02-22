@@ -156,8 +156,7 @@ const registrosConAutor = registrosRecientes?.map(r => ({
             <CardHeader>
               <CardTitle>Actividad reciente</CardTitle>
               <CardDescription>Últimos registros</CardDescription>
-            </CardHeader>
-            
+            </CardHeader>            
             <CardContent>
               {registrosConAutor && registrosConAutor.length > 0 ? (
                 <div className="space-y-3">
@@ -177,6 +176,9 @@ const registrosConAutor = registrosRecientes?.map(r => ({
                 </div>
               )}
             </CardContent>
+            <Link href="/historial">
+              <Button variant="outline" size="sm">Ver todo</Button>
+            </Link>
           </Card>
           {/* Mis niños / Niños asignados */}
           <Card>
