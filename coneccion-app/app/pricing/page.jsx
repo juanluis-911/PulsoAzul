@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/Button'
 const PLANS = [
   {
     id: 'pro_monthly',
-    name: 'Pro Mensual',
-    price: '$9.99',
+    name: 'Básico Mensual',
+    price: '$59',
     period: '/mes',
     description: 'Acceso completo con facturación mensual',
     features: [
@@ -21,8 +21,8 @@ const PLANS = [
   },
   {
     id: 'pro_annual',
-    name: 'Pro Anual',
-    price: '$99',
+    name: 'Básico Anual',
+    price: '$599',
     period: '/año',
     description: 'Ahorra 17% con facturación anual',
     badge: 'Más popular',
