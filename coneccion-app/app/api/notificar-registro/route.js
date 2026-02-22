@@ -7,6 +7,12 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(request) {
+  // Verificar variables de entorno
+  console.log('VAPID_MAILTO:', process.env.VAPID_MAILTO)
+  console.log('NEXT_PUBLIC_VAPID_KEY:', process.env.NEXT_PUBLIC_VAPID_KEY?.slice(0, 10) + '...')
+  console.log('VAPID_PRIVATE_KEY:', process.env.VAPID_PRIVATE_KEY?.slice(0, 10) + '...')
+  console.log('SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 10) + '...')
+
   // Mover setVapidDetails aquí dentro para que solo se ejecute en runtime
   webpush.setVapidDetails(
     process.env.VAPID_MAILTO,
@@ -25,7 +31,11 @@ export async function POST(request) {
       .neq('usuario_id', creadoPor)
 
     if (eqError) throw eqError
-    if (!equipo?.length) return Response.json({ enviados: 0 })
+    console.log('Equipo encontrado:', equipo)
+    if (!equipo?.length) {
+      console.log('Sin miembros en el equipo para notificar')
+      return Response.json({ enviados: 0 })
+    }
 
     const usuariosIds = equipo.map((m) => m.usuario_id)
 
@@ -36,7 +46,11 @@ export async function POST(request) {
       .in('usuario_id', usuariosIds)
 
     if (subError) throw subError
-    if (!subs?.length) return Response.json({ enviados: 0 })
+    console.log('Suscripciones encontradas:', subs)
+    if (!subs?.length) {
+      console.log('Ningún miembro tiene suscripción push activa')
+      return Response.json({ enviados: 0 })
+    }
 
     const payload = JSON.stringify({
       title: `📋 Nuevo registro - ${nombreNino}`,
@@ -60,7 +74,13 @@ export async function POST(request) {
       )
     )
 
+    resultados.forEach((r, i) => {
+      if (r.status === 'rejected') console.error(`Fallo envío [${i}]:`, r.reason)
+      else console.log(`Envío [${i}] exitoso`)
+    })
+
     const enviados = resultados.filter((r) => r.status === 'fulfilled').length
+    console.log(`Enviados: ${enviados}/${subs.length}`)
     return Response.json({ enviados, total: subs.length })
   } catch (err) {
     console.error('Error enviando notificaciones:', err)

@@ -17,7 +17,6 @@ const ETIQUETA_ROL = {
 }
 
 export function RegistroCard({ registro }) {
-  console.log(registro);
   const [open, setOpen] = useState(false)
 
   const tipo     = TIPO_REGISTRO[registro.tipo_registro] || TIPO_REGISTRO.escuela

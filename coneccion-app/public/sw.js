@@ -1,7 +1,13 @@
 self.addEventListener('push', (e) => {
-  const data = e.data?.json() ?? {}
+  let data = {}
+  try {
+    data = e.data?.json() ?? {}
+  } catch {
+    data = { title: 'Pulso Azul', body: e.data?.text() || 'Nueva notificación' }
+  }
+
   e.waitUntil(
-    self.registration.showNotification(data.title || 'Conección', {
+    self.registration.showNotification(data.title || 'Pulso Azul', {
       body: data.body || 'Nuevo registro agregado',
       icon: '/icon-192x192.png',
       badge: '/icon-192x192.png',

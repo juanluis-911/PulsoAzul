@@ -110,6 +110,7 @@ export default function RegistroDiarioPage() {
     }
 
     // Enviar notificación push al resto del equipo (sin bloquear la navegación)
+    console.log('Enviar notificacion por post');
     const nino = ninos.find(n => n.id === formData.ninoId)
     if (nino) {
       fetch('/api/notificar-registro', {
