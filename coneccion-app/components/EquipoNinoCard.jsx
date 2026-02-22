@@ -2,7 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, School, Heart, User, UserPlus } from 'lucide-react'
+import { ChevronDown, School, Heart, User, UserPlus, Phone } from 'lucide-react'
+
+const formatearTelefono = (tel) => {
+  const digits = tel.replace(/\D/g, '')
+  if (digits.length === 10) return `+52${digits}`
+  if (digits.length === 12 && digits.startsWith('52')) return `+${digits}`
+  return `+${digits}`
+}
+
+const whatsappUrl = (tel) => `https://wa.me/${formatearTelefono(tel).replace('+', '')}`
 
 const ROL_CONFIG = {
   maestra_sombra: { label: 'Maestra sombra', Icon: School, color: 'bg-blue-100 text-blue-700' },
@@ -66,13 +75,29 @@ export function EquipoNinoCard({ nino, rol }) {
                         {config.label}
                       </span>
                       {miembro.perfiles?.telefono && (
-                        <a
-                          href={`tel:${miembro.perfiles.telefono}`}
-                          className="block text-xs text-slate-500 hover:text-primary-600 mt-0.5"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          📞 {miembro.perfiles.telefono}
-                        </a>
+                        <div className="flex items-center gap-2 mt-1">
+                          <a
+                            href={`tel:${miembro.perfiles.telefono}`}
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-primary-600"
+                          >
+                            <Phone className="w-3 h-3" />
+                            {miembro.perfiles.telefono}
+                          </a>
+                          <a
+                            href={whatsappUrl(miembro.perfiles.telefono)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 font-medium"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.121 1.532 5.852L.057 23.57a.75.75 0 0 0 .906.94l5.878-1.516A11.955 11.955 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22a9.956 9.956 0 0 1-5.187-1.448l-.37-.22-3.838.99 1.023-3.715-.242-.383A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                            </svg>
+                            WhatsApp
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>
