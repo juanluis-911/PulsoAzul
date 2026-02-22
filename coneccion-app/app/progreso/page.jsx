@@ -12,8 +12,8 @@ import {
   PolarAngleAxis, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
+import ReactMarkdown from 'react-markdown'
 import { FileText, TrendingUp, TrendingDown, Minus, Calendar, Filter, Copy, Check, Bot } from 'lucide-react'
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const CONTEXTO_TIPO = {
@@ -371,18 +371,14 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
     setMostrarAnalisis(true)
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/analizar-ia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+        body: JSON.stringify({ prompt }),
       })
       const data = await res.json()
-      const texto = data.content?.map(b => b.text || '').join('') || 'Sin respuesta.'
-      setAnalisisIA(texto)
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+      setAnalisisIA(data.texto || 'Sin respuesta.')
     } catch (err) {
       setAnalisisIA('Error al conectar con la IA. Intenta de nuevo.')
     } finally {
@@ -519,8 +515,19 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
                           Generando análisis clínico...
                         </div>
                       ) : (
-                        <div className="prose prose-sm max-w-none text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                          {analisisIA}
+                        <div className="prose prose-sm max-w-none text-slate-700 text-sm leading-relaxed
+                          [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-slate-900 [&_h1]:mb-2 [&_h1]:mt-4
+                          [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-800 [&_h2]:mb-2 [&_h2]:mt-4
+                          [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-slate-700 [&_h3]:mb-1 [&_h3]:mt-3
+                          [&_p]:mb-2 [&_p]:leading-relaxed
+                          [&_ul]:pl-4 [&_ul]:mb-2 [&_ul]:space-y-1
+                          [&_ol]:pl-4 [&_ol]:mb-2 [&_ol]:space-y-1
+                          [&_li]:text-slate-700
+                          [&_strong]:font-semibold [&_strong]:text-slate-900
+                          [&_em]:italic [&_em]:text-slate-600
+                          [&_hr]:border-slate-200 [&_hr]:my-3
+                          [&_blockquote]:border-l-4 [&_blockquote]:border-primary-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600">
+                          <ReactMarkdown>{analisisIA}</ReactMarkdown>
                         </div>
                       )}
                     </div>
