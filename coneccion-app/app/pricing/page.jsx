@@ -10,7 +10,7 @@ const PLANS = [
   {
     id: 'pro_monthly',
     name: 'Básico Mensual',
-    price: '$59',
+    price: '$99',
     period: '/mes',
     description: 'Acceso completo con facturación mensual',
     features: [
@@ -23,7 +23,7 @@ const PLANS = [
   {
     id: 'pro_annual',
     name: 'Básico Anual',
-    price: '$549',
+    price: '$899',
     period: '/año',
     description: 'Ahorra facturación anual',
     badge: 'Más popular',

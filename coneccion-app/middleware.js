@@ -21,7 +21,6 @@ export async function middleware(request) {
     }
   )
 
-  // Refrescar sesión (siempre necesario con @supabase/ssr)
   const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
@@ -36,7 +35,21 @@ export async function middleware(request) {
       return NextResponse.redirect(loginUrl)
     }
 
-    // 2. Con sesión → verificar suscripción en Supabase
+    // 2. Maestros y terapeutas → acceso gratuito, sin verificar suscripción propia
+    const { data: equipoRow } = await supabase
+      .from('equipo_terapeutico')
+      .select('rol')
+      .eq('usuario_id', user.id)
+      .in('rol', ['maestra_sombra', 'terapeuta'])
+      .limit(1)
+      .maybeSingle()
+
+    if (equipoRow) {
+      // Es maestro o terapeuta → dejar pasar sin revisar suscripción
+      return response
+    }
+
+    // 3. Para padres → verificar suscripción
     const { data: sub } = await supabase
       .from('subscriptions')
       .select('status, current_period_end, cancel_at_period_end')
@@ -45,7 +58,6 @@ export async function middleware(request) {
 
     const hasAccess = sub?.status === 'active' || sub?.status === 'trialing'
 
-    // Si canceló pero el período aún no venció, seguimos dando acceso
     const periodEnded = sub?.current_period_end
       ? new Date(sub.current_period_end) < new Date()
       : true
@@ -54,7 +66,6 @@ export async function middleware(request) {
 
     if (!hasAccess && !stillActive) {
       const pricingUrl = new URL('/pricing', request.url)
-      // Pasamos el motivo para mostrar mensaje en la página
       pricingUrl.searchParams.set(
         'reason',
         sub?.status === 'past_due' ? 'payment_failed' : 'no_subscription'

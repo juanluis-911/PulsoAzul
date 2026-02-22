@@ -8,6 +8,7 @@ import { Input, Select } from '@/components/ui/Input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { usePadreSubscription } from '@/hooks/usePadreSubscription'
 
 // ─── Constantes clínicas ──────────────────────────────────────────────────────
 
@@ -165,6 +166,9 @@ export default function RegistroDiarioPage() {
     tipoRegistro: 'escuela',
   })
 
+  // ── Verificación de suscripción del padre ──
+  const { padreHaPagado, loading: loadingPago } = usePadreSubscription(base.ninoId)
+
   // 1. Regulación emocional
   const [regulacionInicio, setRegulacionInicio] = useState(null)
   const [regulacionFin, setRegulacionFin]       = useState(null)
@@ -183,30 +187,30 @@ export default function RegistroDiarioPage() {
   const [nivelApoyo, setNivelApoyo] = useState(null)
 
   // 5. Conducta / regulación emocional
-  const [conductaPatron, setConductaPatron] = useState(null)    // frecuencia conductas disruptivas
-  const [conductaDuracion, setConductaDuracion] = useState('')  // minutos estimados
+  const [conductaPatron, setConductaPatron] = useState(null)
+  const [conductaDuracion, setConductaDuracion] = useState('')
 
   // 6. Comunicación y lenguaje
-  const [comunicacionIniciativa, setComunicacionIniciativa] = useState(null) // 1-5
-  const [comunicacionClara, setComunicacionClara] = useState(null)           // 1-5
+  const [comunicacionIniciativa, setComunicacionIniciativa] = useState(null)
+  const [comunicacionClara, setComunicacionClara] = useState(null)
 
   // 7. Habilidades sociales
-  const [socialInteraccion, setSocialInteraccion] = useState(null) // 1-5
-  const [socialTurnos, setSocialTurnos] = useState(null)           // 1-5
+  const [socialInteraccion, setSocialInteraccion] = useState(null)
+  const [socialTurnos, setSocialTurnos] = useState(null)
 
   // 8. Autonomía
-  const [autonomiaHigiene, setAutonomiaHigiene] = useState(null)   // nivel apoyo 0-4
-  const [autonomiaAlimentacion, setAutonomiaAlimentacion] = useState(null) // nivel apoyo 0-4
+  const [autonomiaHigiene, setAutonomiaHigiene] = useState(null)
+  const [autonomiaAlimentacion, setAutonomiaAlimentacion] = useState(null)
 
   // 9. Habilidades académicas/cognitivas
-  const [academicoAtencion, setAcademicoAtencion] = useState(null) // 1-5
-  const [academicoPersistencia, setAcademicoPersistencia] = useState(null) // 1-5
+  const [academicoAtencion, setAcademicoAtencion] = useState(null)
+  const [academicoPersistencia, setAcademicoPersistencia] = useState(null)
 
   // 10. Habilidades motoras
-  const [motoraFina, setMotoraFina] = useState(null)   // 1-5
-  const [motoraGruesa, setMotoraGruesa] = useState(null) // 1-5
+  const [motoraFina, setMotoraFina] = useState(null)
+  const [motoraGruesa, setMotoraGruesa] = useState(null)
 
-  // Notas libres (solo observaciones puntuales, no reemplaza métricas)
+  // Notas libres
   const [notasLibres, setNotasLibres] = useState('')
 
   useEffect(() => { fetchNinos() }, [])
@@ -244,6 +248,13 @@ export default function RegistroDiarioPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!base.ninoId) { setError('Selecciona un niño'); return }
+
+    // ── Bloquear si el padre no ha pagado ──
+    if (padreHaPagado === false) {
+      setError('El padre de este niño no tiene una suscripción activa. No es posible agregar registros por el momento.')
+      return
+    }
+
     if (!regulacionInicio || !regulacionFin) { setError('Registra el nivel de regulación al inicio y al fin del día'); return }
     if (nivelApoyo === null) { setError('Selecciona el nivel de apoyo general'); return }
 
@@ -262,9 +273,7 @@ export default function RegistroDiarioPage() {
       fecha: base.fecha,
       tipo_registro: base.tipoRegistro,
       creado_por: user.id,
-      // Estado de ánimo legacy → mapeamos regulación inicio
       estado_animo: ['muy_dificil','dificil','regular','bien','muy_bien'][regulacionInicio - 1],
-      // Columna JSONB con toda la data clínica
       metricas: {
         regulacion: { inicio: regulacionInicio, fin: regulacionFin },
         contexto,
@@ -278,7 +287,6 @@ export default function RegistroDiarioPage() {
         motora: { fina: motoraFina, gruesa: motoraGruesa },
       },
       notas: notasLibres || null,
-      // Legacy: actividades como array de strings
       actividades: actividadesActivas.map(a => a.tipo),
     }
 
@@ -316,12 +324,28 @@ export default function RegistroDiarioPage() {
     </div>
   )
 
+  // ── Bandera de acceso bloqueado (solo cuando ya hay niño seleccionado y confirmamos que no pagó) ──
+  const bloqueado = base.ninoId && padreHaPagado === false
+
   return (
     <div className="min-h-screen bg-slate-50 py-8">
       <div className="container mx-auto px-4 max-w-2xl">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6">
           <ArrowLeft className="w-4 h-4" /> Volver al dashboard
         </Link>
+
+        {/* ── Aviso de suscripción inactiva ── */}
+        {bloqueado && (
+          <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-xl p-4 mb-5 flex items-start gap-3">
+            <span className="text-xl flex-shrink-0">⚠️</span>
+            <div>
+              <p className="font-semibold text-sm">Suscripción inactiva</p>
+              <p className="text-sm mt-0.5">
+                El padre de este niño no tiene una suscripción activa. No podrás guardar registros hasta que realice su pago.
+              </p>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -634,7 +658,7 @@ export default function RegistroDiarioPage() {
 
           <div className="flex gap-3 justify-end pb-8">
             <Link href="/dashboard"><Button variant="ghost" type="button">Cancelar</Button></Link>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || loadingPago || bloqueado}>
               {loading ? 'Guardando...' : '💾 Guardar registro'}
             </Button>
           </div>
