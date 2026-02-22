@@ -4,6 +4,13 @@ import { NextResponse } from 'next/server'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
+// Convierte unix timestamp a ISO string de forma segura
+function toISO(unixSeconds) {
+  if (!unixSeconds) return null
+  const d = new Date(unixSeconds * 1000)
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 // Cliente admin: bypasea RLS para poder escribir en subscriptions
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -49,7 +56,7 @@ export async function POST(request) {
           stripe_subscription_id: subscription.id,
           status:                'active',
           plan,
-          current_period_end:    new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end:    toISO(subscription.current_period_end),
           cancel_at_period_end:  subscription.cancel_at_period_end,
         })
         break
@@ -85,7 +92,7 @@ export async function POST(request) {
           stripe_subscription_id: invoice.subscription,
           status:                 'active',
           plan,
-          current_period_end:     new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end:     toISO(subscription.current_period_end),
           cancel_at_period_end:   subscription.cancel_at_period_end,
         })
         break
@@ -152,7 +159,7 @@ export async function POST(request) {
         await supabaseAdmin.from('subscriptions').update({
           status:               statusMap[subscription.status] ?? 'past_due',
           plan,
-          current_period_end:   new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end:   toISO(subscription.current_period_end),
           cancel_at_period_end: subscription.cancel_at_period_end,
         }).eq('id', userId)
         break
