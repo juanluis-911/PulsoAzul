@@ -300,6 +300,9 @@ export default function ProgresoPage() {
 
   // ── Generador de prompt ──────────────────────────────────────────────────
   const [copiado, setCopiado] = useState(false)
+  const [analisisIA, setAnalisisIA] = useState('')
+  const [loadingIA, setLoadingIA] = useState(false)
+  const [mostrarAnalisis, setMostrarAnalisis] = useState(false)
 
   const generarPrompt = () => {
     if (!datosFiltrados.length) return ''
@@ -358,6 +361,33 @@ Con base en estos datos:
 5. Si detectas algo que requiere atención urgente, menciónalo claramente.
 
 Responde en español, con lenguaje accesible para padres pero también técnico para profesionales.`
+  }
+
+  const analizarConIA = async () => {
+    const prompt = generarPrompt()
+    if (!prompt) return
+    setLoadingIA(true)
+    setAnalisisIA('')
+    setMostrarAnalisis(true)
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await res.json()
+      const texto = data.content?.map(b => b.text || '').join('') || 'Sin respuesta.'
+      setAnalisisIA(texto)
+    } catch (err) {
+      setAnalisisIA('Error al conectar con la IA. Intenta de nuevo.')
+    } finally {
+      setLoadingIA(false)
+    }
   }
 
   const copiarPrompt = async () => {
@@ -449,31 +479,53 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
           </div>
         ) : (
           <>
-            {/* ── Botón Prompt IA ── */}
+            {/* ── Análisis IA ── */}
             <div className="mb-5">
-              <div className="rounded-2xl border-2 border-dashed border-primary-200 bg-primary-50 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-5 h-5 text-white" />
+                              <div className="rounded-2xl border-2 border-dashed border-primary-200 bg-primary-50 p-5 flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center flex-shrink-0">
+                        <Bot className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">Analizar con IA</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Genera un análisis clínico con estrategias concretas basado en los datos del periodo seleccionado.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={copiarPrompt}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold text-xs transition-all ${
+                          copiado ? 'bg-green-500 text-white' : 'bg-white border border-slate-300 text-slate-600 hover:border-slate-400'
+                        }`}>
+                        {copiado ? <><Check className="w-3.5 h-3.5" />Copiado</> : <><Copy className="w-3.5 h-3.5" />Copiar prompt</>}
+                      </button>
+                      <button onClick={analizarConIA} disabled={loadingIA}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all disabled:opacity-60">
+                        {loadingIA
+                          ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analizando...</>
+                          : <><Bot className="w-4 h-4" />Analizar ahora</>}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm">Analizar con IA</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Copia un prompt listo con todos los datos del periodo seleccionado y pégalo en ChatGPT, Claude u otra IA para obtener análisis, estrategias y resumen ejecutivo.
-                    </p>
-                  </div>
+
+                  {/* Resultado IA */}
+                  {mostrarAnalisis && (
+                    <div className="bg-white rounded-xl border border-primary-100 p-4">
+                      {loadingIA ? (
+                        <div className="flex items-center gap-3 text-slate-500 text-sm py-4 justify-center">
+                          <span className="w-5 h-5 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin" />
+                          Generando análisis clínico...
+                        </div>
+                      ) : (
+                        <div className="prose prose-sm max-w-none text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                          {analisisIA}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button onClick={copiarPrompt}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex-shrink-0 ${
-                    copiado
-                      ? 'bg-green-500 text-white'
-                      : 'bg-primary-600 hover:bg-primary-700 text-white shadow-sm'
-                  }`}>
-                  {copiado
-                    ? <><Check className="w-4 h-4" /> ¡Copiado!</>
-                    : <><Copy className="w-4 h-4" /> Copiar prompt</>}
-                </button>
-              </div>
             </div>
 
             {/* ── KPI Cards ── */}
