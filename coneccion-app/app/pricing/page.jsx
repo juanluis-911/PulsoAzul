@@ -22,13 +22,12 @@ const PLANS = [
   {
     id: 'pro_annual',
     name: 'Básico Anual',
-    price: '$599',
+    price: '$549',
     period: '/año',
-    description: 'Ahorra 17% con facturación anual',
+    description: 'Ahorra facturación anual',
     badge: 'Más popular',
     features: [
       'Todo lo del plan mensual',
-      '2 meses gratis',
       'Acceso anticipado a nuevas funciones',
       'Soporte prioritario',
     ],
