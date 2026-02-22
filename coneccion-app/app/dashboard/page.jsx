@@ -82,10 +82,10 @@ const registrosConAutor = registrosRecientes?.map(r => ({
     || etiquetaRol
   console.log('perfil: '+perfil);
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
       <Navbar user={user} />
-
-      <div className="container mx-auto px-4 py-8">
+      <main className="flex-1 overflow-auto pt-14 md:pt-0 px-4 py-6 md:p-8">
+        <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           {/* ✅ Usa nombreMostrar, no user.user_metadata directo */}
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
@@ -230,6 +230,7 @@ const registrosConAutor = registrosRecientes?.map(r => ({
           </Card>
         </div>
       </div>
+      </main>
     </div>
   )
 }

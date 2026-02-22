@@ -50,10 +50,10 @@ export default async function NinoPerfilPage({ params }) {
   const esPadre = nino.padre_id === user.id
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar user={user} />
-
-      <div className="container mx-auto px-4 py-8">
+    <div className="flex min-h-screen bg-slate-50">
+    <Navbar user={user} />
+    <main className="flex-1 overflow-auto pt-14 md:pt-0 px-4 py-6 md:p-8">
+    <div className="max-w-5xl mx-auto">
         <Link 
           href="/dashboard" 
           className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6"
@@ -271,6 +271,7 @@ export default async function NinoPerfilPage({ params }) {
           </div>
         </div>
       </div>
+      </main>
     </div>
   )
 }

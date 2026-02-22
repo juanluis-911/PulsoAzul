@@ -404,10 +404,10 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
   )
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
       <Navbar user={user} />
-
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="flex-1 overflow-auto pt-14 md:pt-0 px-4 py-6 md:p-8">
+        <div className="max-w-5xl mx-auto">
 
         {/* Header */}
         <div className="mb-6">
@@ -737,6 +737,7 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
           </>
         )}
       </div>
+      </main>
     </div>
   )
 }
