@@ -23,46 +23,62 @@ export async function POST(request) {
       )
     }
 
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        data: {
-          nino_id: ninoId,
-          rol: rol,
-          permisos: permisos,
-          rol_principal: rol, // ✅ Agregado: lo usamos en complete-profile
-        },
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      }
-    )
+    // ✅ Primero verificar si el usuario ya existe en auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = existingUsers?.users?.find(u => u.email === email)
 
-    if (inviteError) {
-      console.error('Error invitando usuario:', inviteError)
-      return NextResponse.json({ error: inviteError.message }, { status: 500 })
+    let userId
+
+    if (existingUser) {
+      // El usuario ya tiene cuenta — solo lo agregamos al equipo, sin reenviar invitación
+      userId = existingUser.id
+    } else {
+      // Usuario nuevo — invitar por email
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        email,
+        {
+          data: {
+            nino_id: ninoId,
+            rol: rol,
+            permisos: permisos,
+            rol_principal: rol,
+          },
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        }
+      )
+
+      if (inviteError) {
+        console.error('Error invitando usuario:', inviteError)
+        return NextResponse.json({ error: inviteError.message }, { status: 500 })
+      }
+
+      userId = inviteData.user.id
     }
 
-    // ✅ Insertar en equipo_terapeutico solo si no existe ya
+    // ✅ Agregar al equipo terapéutico (upsert para evitar duplicados)
     const { error: equipoError } = await supabaseAdmin
       .from('equipo_terapeutico')
       .upsert(
         {
           nino_id: ninoId,
-          usuario_id: inviteData.user.id,
+          usuario_id: userId,
           rol: rol,
           permisos: permisos,
           estado: 'activo',
         },
-        { onConflict: 'nino_id, usuario_id' } // evita duplicados si se reinvita
+        { onConflict: 'nino_id, usuario_id' }
       )
 
     if (equipoError) {
       console.error('Error agregando al equipo:', equipoError)
+      return NextResponse.json({ error: 'Error al agregar al equipo' }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `Invitación enviada a ${email}`,
-    })
+    const mensaje = existingUser
+      ? `${email} ya tiene cuenta y fue agregado al equipo del niño.`
+      : `Invitación enviada a ${email}`
+
+    return NextResponse.json({ success: true, message: mensaje })
 
   } catch (error) {
     console.error('Error en API invitar:', error)

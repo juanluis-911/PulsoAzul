@@ -58,6 +58,16 @@ function NinoCard({ nino }) {
           <p className="text-xs text-slate-500">
             {edad ? `${edad} ${edad === 1 ? 'año' : 'años'}` : formatearFecha(nino.fecha_nacimiento)}
           </p>
+          {nino.diagnostico && (
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
+              🩺 {nino.diagnostico}
+            </p>
+          )}
+          {nino.nombre_padre && (
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              👨‍👩‍👧 {nino.nombre_padre}
+            </p>
+          )}
         </div>
         <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-primary-400 transition-colors shrink-0" />
       </div>
@@ -129,12 +139,33 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
     ninos = data || []
   } else {
+    // Paso 1: traer niños asignados
     const { data, error } = await supabase
       .from('equipo_terapeutico')
       .select('nino_id, rol, ninos (*)')
       .eq('usuario_id', user.id)
+
     if (error) console.error('Error obteniendo equipo:', error)
-    ninos = data?.map(e => e.ninos).filter(Boolean) || []
+
+    const ninosRaw = data?.map(e => e.ninos).filter(Boolean) || []
+
+    // Paso 2: traer perfiles de los padres
+    const padreIds = [...new Set(ninosRaw.map(n => n.padre_id).filter(Boolean))]
+    let perfilesPadres = []
+
+    if (padreIds.length > 0) {
+      const { data: perfilesData } = await supabase
+        .from('perfiles')
+        .select('id, nombre_completo')
+        .in('id', padreIds)
+      perfilesPadres = perfilesData || []
+    }
+
+    // Paso 3: combinar
+    ninos = ninosRaw.map(n => ({
+      ...n,
+      nombre_padre: perfilesPadres.find(p => p.id === n.padre_id)?.nombre_completo || null,
+    }))
   }
 
   const { data: registrosRecientes } = await supabase
@@ -162,7 +193,6 @@ export default async function DashboardPage() {
     user.user_metadata?.nombre_completo?.split(' ')[0] ||
     etiquetaRol
 
-  // ── Estadística rápida: último registro ──────────────────────────────────
   const ultimoRegistro = registrosConAutor?.[0]
   const ultimoEstado = ultimoRegistro?.estado_animo
     ? ESTADOS_ANIMO[ultimoRegistro.estado_animo]
@@ -176,7 +206,6 @@ export default async function DashboardPage() {
         {/* ── Hero / encabezado ───────────────────────────────────────────── */}
         <div className="bg-gradient-to-br from-primary-600 via-primary-500 to-sky-400 px-5 pt-6 pb-8 md:px-8">
           <div className="max-w-2xl mx-auto">
-            {/* Saludo */}
             <div className="flex items-start justify-between mb-5">
               <div>
                 <p className="text-primary-100 text-sm font-medium mb-0.5 flex items-center gap-1.5">
@@ -198,7 +227,6 @@ export default async function DashboardPage() {
               />
             </div>
 
-            {/* Chip de último estado de ánimo */}
             {ultimoEstado && (
               <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm 
                               border border-white/20 rounded-full px-3 py-1.5">
@@ -246,7 +274,7 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* ── Grid principal (mobile: 1 col / desktop: 2 cols) ──────────── */}
+          {/* ── Grid principal ────────────────────────────────────────────── */}
           <div className="grid gap-4 md:grid-cols-2">
 
             {/* Actividad reciente */}
@@ -301,7 +329,7 @@ export default async function DashboardPage() {
 
           </div>
 
-          {/* ── Banner motivacional (sólo si hay niños) ───────────────────── */}
+          {/* ── Banner motivacional ───────────────────────────────────────── */}
           {ninos.length > 0 && (
             <div className="mt-4 rounded-2xl bg-gradient-to-r from-violet-50 to-sky-50 
                             border border-violet-100 p-4 flex items-center gap-3">
