@@ -50,41 +50,48 @@ export default function CompleteProfile() {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage({ type: '', text: '' })
+  e.preventDefault()
+  setLoading(true)
+  setMessage({ type: '', text: '' })
 
-    const formData = new FormData(e.target)
+  const formData = new FormData(e.target)
 
-    const profileData = {
-      id: user.id,
-      nombre_completo: formData.get('nombre_completo'),
-      telefono: formData.get('telefono'),
-      rol_principal: rolAsignado || formData.get('rol_principal'), // ✅ usa el asignado
-    }
-
-    try {
-      const { error } = await supabase
-        .from('perfiles')
-        .upsert(profileData)
-
-      if (error) throw error
-
-      // ✅ Actualizar también user_metadata para consistencia
-      await supabase.auth.updateUser({
-        data: { nombre_completo: profileData.nombre_completo }
-      })
-
-      setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
-
-      setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
-
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
-    } finally {
-      setLoading(false)
-    }
+  const profileData = {
+    nombre_completo: formData.get('nombre_completo'),
+    telefono: formData.get('telefono'),
+    rol_principal: rolAsignado || formData.get('rol_principal'),
   }
+
+  try {
+    // ✅ UPDATE en lugar de upsert — el trigger ya creó el registro al registrarse
+    const { error } = await supabase
+      .from('perfiles')
+      .update(profileData)
+      .eq('id', user.id)
+
+    if (error) {
+      // Si falla el update (registro no existe), intentar insert como fallback
+      const { error: insertError } = await supabase
+        .from('perfiles')
+        .insert({ id: user.id, ...profileData })
+
+      if (insertError) throw insertError
+    }
+
+    // Actualizar también user_metadata para consistencia
+    await supabase.auth.updateUser({
+      data: { nombre_completo: profileData.nombre_completo }
+    })
+
+    setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
+    setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
+
+  } catch (error) {
+    setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
+  } finally {
+    setLoading(false)
+  }
+}
 
   if (!user) {
     return (

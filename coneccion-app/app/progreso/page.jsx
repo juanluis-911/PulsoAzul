@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Navbar } from '@/components/Navbar'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { descargarReportePDF } from '@/lib/pdf-reporte'
+
 import {
   LineChart, Line, BarChart, Bar, RadarChart, Radar, PolarGrid,
   PolarAngleAxis, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -34,6 +36,8 @@ const AREAS = [
 ]
 
 const ESTADO_ANIMO_VALOR = { muy_dificil: 1, dificil: 2, regular: 3, bien: 4, muy_bien: 5 }
+
+
 
 function avg(...vals) {
   const v = vals.filter(x => x !== null && x !== undefined)
@@ -225,6 +229,44 @@ export default function ProgresoPage() {
   const [periodo, setPeriodo]     = useState('mes')      // semana|mes|todo
   const [agrupacion, setAgrupacion] = useState('semana') // dia|semana|mes
   const [areasVis, setAreasVis]   = useState(['regulacion_inicio','comunicacion','social','academico'])
+
+  const [generandoPDF, setGenerandoPDF] = useState(false)
+
+  const generarYDescargarReporte = async () => {
+    if (!datosFiltrados.length) return
+    setGenerandoPDF(true)
+
+    const nino = ninos.find(n => n.id === ninoId)
+    const nombreNino = nino ? `${nino.nombre} ${nino.apellido}` : 'el niño'
+    const periodoLabel = periodo === 'semana' ? 'Última semana'
+      : periodo === 'mes' ? 'Último mes' : 'Todo el historial'
+
+    try {
+      // Genera y descarga el PDF en el cliente
+      descargarReportePDF({
+        nombreNino,
+        kpis,
+        datos: datosFiltrados,
+        serieAgrupada,
+        analisisIA,
+        periodoLabel,
+      })
+
+      // Envía notificación push al usuario actual
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await fetch('/api/notificar-reporte', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario_id: user.id, nombreNino }),
+        })
+      }
+    } catch (err) {
+      console.error('Error generando reporte:', err)
+    } finally {
+      setGenerandoPDF(false)
+    }
+  }
 
   useEffect(() => { init() }, [])
 
@@ -502,6 +544,25 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
                         {loadingIA
                           ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analizando...</>
                           : <><Bot className="w-4 h-4" />Analizar ahora</>}
+                      </button>
+                      <button
+                        onClick={generarYDescargarReporte}
+                        disabled={generandoPDF || !datosFiltrados.length}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 
+                                  disabled:opacity-50 text-white text-sm font-medium rounded-xl 
+                                  shadow-sm transition-colors"
+                      >
+                        {generandoPDF ? (
+                          <>
+                            <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                            </svg>
+                            Generando…
+                          </>
+                        ) : (
+                          <>📄 Descargar reporte</>
+                        )}
                       </button>
                     </div>
                   </div>
