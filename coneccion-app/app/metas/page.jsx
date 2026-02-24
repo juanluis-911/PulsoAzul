@@ -7,7 +7,7 @@ import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
 import {
   Target, Plus, CheckCircle2, Clock, PauseCircle, XCircle,
-  Pencil, Trash2, TrendingUp, ChevronRight, Sparkles, Flag
+  Trash2, TrendingUp, ChevronRight, UserCheck, Lock, Pencil
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -31,6 +31,13 @@ const ESTADOS = [
 ]
 const ESTADO_MAP = Object.fromEntries(ESTADOS.map(e => [e.key, e]))
 
+const ROL_LABEL = { padre: 'Padre/Madre', maestra_sombra: 'Maestra', terapeuta: 'Terapeuta' }
+const ROL_COLOR = {
+  padre:          'bg-amber-100 text-amber-700',
+  maestra_sombra: 'bg-blue-100 text-blue-700',
+  terapeuta:      'bg-violet-100 text-violet-700',
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtFecha = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const diasRestantes = d => {
@@ -38,7 +45,7 @@ const diasRestantes = d => {
   return Math.ceil((new Date(d + 'T12:00:00') - new Date()) / 86400000)
 }
 
-// ─── Anillo de progreso SVG ───────────────────────────────────────────────────
+// ─── Anillo SVG ───────────────────────────────────────────────────────────────
 function RingProgress({ pct = 0, color = '#6366f1', size = 56, stroke = 5 }) {
   const r = (size - stroke * 2) / 2
   const circ = 2 * Math.PI * r
@@ -47,13 +54,12 @@ function RingProgress({ pct = 0, color = '#6366f1', size = 56, stroke = 5 }) {
     <svg width={size} height={size} className="-rotate-90">
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round" style={{ transition: 'stroke-dashoffset .6s ease' }} />
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset .6s ease' }} />
     </svg>
   )
 }
 
-// ─── Chip área ────────────────────────────────────────────────────────────────
 function ChipArea({ areaKey, small }) {
   const a = AREA_MAP[areaKey] || { label: areaKey, emoji: '•', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }
   return (
@@ -63,7 +69,6 @@ function ChipArea({ areaKey, small }) {
   )
 }
 
-// ─── Chip estado ─────────────────────────────────────────────────────────────
 function ChipEstado({ estadoKey, small }) {
   const e = ESTADO_MAP[estadoKey] || ESTADO_MAP.activa
   const { Icon } = e
@@ -74,7 +79,6 @@ function ChipEstado({ estadoKey, small }) {
   )
 }
 
-// ─── Avatar inicial ───────────────────────────────────────────────────────────
 function AvatarInicial({ nombre, size = 'w-7 h-7 text-xs' }) {
   const ini = nombre?.charAt(0)?.toUpperCase() || '?'
   const cols = ['bg-sky-100 text-sky-700','bg-violet-100 text-violet-700','bg-emerald-100 text-emerald-700','bg-rose-100 text-rose-700','bg-amber-100 text-amber-700']
@@ -85,12 +89,178 @@ function AvatarInicial({ nombre, size = 'w-7 h-7 text-xs' }) {
   )
 }
 
+// ─── Selector de responsables ─────────────────────────────────────────────────
+function SelectorResponsables({ equipo, seleccionados, onChange }) {
+  const toggle = uid => onChange(
+    seleccionados.includes(uid) ? seleccionados.filter(id => id !== uid) : [...seleccionados, uid]
+  )
+  if (!equipo.length) return (
+    <p className="text-xs text-slate-400 italic text-center py-3">No hay otros miembros en el equipo todavía.</p>
+  )
+  return (
+    <div className="space-y-2">
+      {equipo.map(m => {
+        const sel = seleccionados.includes(m.usuario_id)
+        return (
+          <button key={m.usuario_id} onClick={() => toggle(m.usuario_id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 transition-all text-left
+              ${sel ? 'border-primary-400 bg-primary-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+            <AvatarInicial nombre={m.nombre} size="w-9 h-9 text-sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 truncate">{m.nombre}</p>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROL_COLOR[m.rol] || 'bg-slate-100 text-slate-500'}`}>
+                {ROL_LABEL[m.rol] || m.rol}
+              </span>
+            </div>
+            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all
+              ${sel ? 'bg-primary-500 border-primary-500' : 'border-slate-300'}`}>
+              {sel && <CheckCircle2 className="w-3 h-3 text-white" />}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Modal editar meta ────────────────────────────────────────────────────────
+function EditarMetaModal({ meta, equipo, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    titulo:         meta.titulo || '',
+    descripcion:    meta.descripcion || '',
+    fecha_objetivo: meta.fecha_objetivo || '',
+    area:           meta.area || '',
+  })
+  const [responsables, setResponsables] = useState(meta.responsables?.map(r => r.usuario_id) || [])
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const guardar = async () => {
+    if (!form.titulo.trim()) { setError('El título es obligatorio.'); return }
+    setLoading(true)
+    const sb = createClient()
+
+    await sb.from('metas').update({
+      titulo:         form.titulo.trim(),
+      descripcion:    form.descripcion.trim() || null,
+      fecha_objetivo: form.fecha_objetivo || null,
+      area:           form.area,
+    }).eq('id', meta.id)
+
+    // Reemplazar responsables: borrar todos y volver a insertar
+    await sb.from('metas_responsables').delete().eq('meta_id', meta.id)
+    if (responsables.length) {
+      await sb.from('metas_responsables').insert(
+        responsables.map(uid => ({ meta_id: meta.id, usuario_id: uid }))
+      )
+    }
+
+    onSaved()
+    onClose()
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    const fn = e => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', fn)
+    return () => document.removeEventListener('keydown', fn)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+          <h2 className="font-bold text-slate-900 text-base">Editar meta</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {/* Área */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-2">Área de desarrollo</label>
+            <div className="grid grid-cols-3 gap-2">
+              {AREAS.map(a => (
+                <button key={a.key} onClick={() => set('area', a.key)}
+                  className={`rounded-xl border-2 py-2 text-xs font-semibold transition-all flex flex-col items-center gap-1
+                    ${form.area === a.key ? `${a.bg} ${a.text} ${a.border}` : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+                  <span className="text-lg">{a.emoji}</span>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Título */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Título *</label>
+            <input value={form.titulo} onChange={e => set('titulo', e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
+                         focus:outline-none focus:ring-2 focus:ring-primary-400" />
+          </div>
+
+          {/* Descripción */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              Descripción <span className="font-normal text-slate-400">(opcional)</span>
+            </label>
+            <textarea value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
+                         focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none" />
+          </div>
+
+          {/* Fecha */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              Fecha objetivo <span className="font-normal text-slate-400">(opcional)</span>
+            </label>
+            <input type="date" value={form.fecha_objetivo} onChange={e => set('fecha_objetivo', e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
+                         focus:outline-none focus:ring-2 focus:ring-primary-400" />
+          </div>
+
+          {/* Responsables */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5" /> Responsables
+            </label>
+            <SelectorResponsables equipo={equipo} seleccionados={responsables} onChange={setResponsables} />
+            {responsables.length > 0 && (
+              <div className="mt-2 bg-primary-50 border border-primary-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                <UserCheck className="w-3.5 h-3.5 text-primary-500 shrink-0" />
+                <p className="text-xs text-primary-700 font-medium">
+                  {responsables.length} responsable{responsables.length !== 1 ? 's' : ''} seleccionado{responsables.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
+        </div>
+
+        <div className="px-5 pb-5 pt-3 border-t border-slate-100">
+          <Button onClick={guardar} disabled={loading} className="w-full gap-2">
+            {loading ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Pencil className="w-4 h-4" />}
+            {loading ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Tarjeta de meta ──────────────────────────────────────────────────────────
 function MetaCard({ meta, ninos, onSelect, onLograda }) {
-  const a = AREA_MAP[meta.area] || AREA_MAP.regulacion
-  const nino = ninos.find(n => n.id === meta.nino_id)
-  const pct = meta.progreso ?? 0
-  const dias = diasRestantes(meta.fecha_objetivo)
+  const a     = AREA_MAP[meta.area] || AREA_MAP.regulacion
+  const nino  = ninos.find(n => n.id === meta.nino_id)
+  const pct   = meta.progreso ?? 0
+  const dias  = diasRestantes(meta.fecha_objetivo)
   const vencida = dias !== null && dias < 0 && meta.estado === 'activa'
   const lograda = meta.estado === 'lograda'
 
@@ -99,18 +269,12 @@ function MetaCard({ meta, ninos, onSelect, onLograda }) {
       className={`group relative bg-white rounded-2xl border shadow-sm hover:shadow-lg
                   transition-all duration-200 cursor-pointer overflow-hidden active:scale-[0.99]
                   ${lograda ? 'border-emerald-200' : 'border-slate-100 hover:border-primary-100'}`}>
-
-      {/* Franja de color superior por área */}
       <div className="h-1 w-full" style={{ backgroundColor: a.hex }} />
-
-      {/* Confetti de fondo si lograda */}
       {lograda && (
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
           style={{ backgroundImage: 'radial-gradient(circle, #22c55e 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
       )}
-
       <div className="p-4">
-        {/* Header: chips + anillo */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
             <ChipArea areaKey={meta.area} small />
@@ -121,29 +285,36 @@ function MetaCard({ meta, ninos, onSelect, onLograda }) {
               </span>
             )}
           </div>
-          {/* Anillo */}
           <div className="relative shrink-0">
             <RingProgress pct={pct} color={lograda ? '#22c55e' : a.hex} size={48} stroke={4} />
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
-              {pct}%
-            </span>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">{pct}%</span>
           </div>
         </div>
 
-        {/* Título */}
-        <p className="font-semibold text-slate-900 text-sm leading-snug mb-1 line-clamp-2">
-          {meta.titulo}
-        </p>
+        <p className="font-semibold text-slate-900 text-sm leading-snug mb-1 line-clamp-2">{meta.titulo}</p>
+        {nino && <p className="text-xs text-slate-400 mb-3">👦 {nino.nombre} {nino.apellido}</p>}
 
-        {/* Niño */}
-        {nino && (
-          <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-            <span>👦</span> {nino.nombre} {nino.apellido}
-          </p>
+        {/* Responsables en tarjeta */}
+        {meta.responsables?.length > 0 && (
+          <div className="mb-3">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+              <UserCheck className="w-3 h-3" /> Responsables
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {meta.responsables.map(r => (
+                <span key={r.usuario_id} className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
+                  <AvatarInicial nombre={r.nombre} size="w-3.5 h-3.5 text-[8px]" />
+                  <span className="text-[10px] font-semibold text-slate-700">{r.nombre?.split(' ')[0]}</span>
+                  <span className={`text-[9px] font-semibold px-1 rounded-full ${ROL_COLOR[r.rol] || 'bg-slate-100 text-slate-500'}`}>
+                    {ROL_LABEL[r.rol] || r.rol}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
           <span className={`text-xs ${vencida ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
             {!meta.fecha_objetivo ? 'Sin fecha límite'
               : dias === 0 ? '🔔 Vence hoy'
@@ -166,15 +337,23 @@ function MetaCard({ meta, ninos, onSelect, onLograda }) {
 }
 
 // ─── Modal detalle ────────────────────────────────────────────────────────────
-function MetaModal({ meta, ninos, rol, onClose, onUpdate, onDelete }) {
-  const [progreso, setProgreso] = useState(meta.progreso ?? 0)
-  const [nota, setNota]         = useState('')
-  const [actus, setActus]       = useState([])
-  const [loading, setLoading]   = useState(false)
-  const [loadingA, setLoadingA] = useState(true)
-  const nino  = ninos.find(n => n.id === meta.nino_id)
-  const area  = AREA_MAP[meta.area] || AREA_MAP.regulacion
-  const puedeEditar = ['padre','terapeuta','maestra_sombra'].includes(rol)
+function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete }) {
+  const [progreso, setProgreso]   = useState(meta.progreso ?? 0)
+  const [nota, setNota]           = useState('')
+  const [actus, setActus]         = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [loadingA, setLoadingA]   = useState(true)
+  const [editando, setEditando]   = useState(false)
+
+  const nino   = ninos.find(n => n.id === meta.nino_id)
+  const area   = AREA_MAP[meta.area] || AREA_MAP.regulacion
+  const lograda = meta.estado === 'lograda'
+
+  // FIX: el creador siempre puede actualizar, además de los responsables asignados
+  const esResponsable = meta.responsables?.some(r => r.usuario_id === userId)
+  const esPadreOCreador = meta.creado_por === userId
+  const puedeActualizar = (esResponsable || esPadreOCreador) && meta.estado === 'activa'
+  const puedeEditar = meta.creado_por === userId || esResponsable
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -186,10 +365,30 @@ function MetaModal({ meta, ninos, rol, onClose, onUpdate, onDelete }) {
 
   const fetchActus = async () => {
     const sb = createClient()
-    const { data } = await sb.from('metas_actualizaciones')
-      .select('*, perfiles(nombre_completo, rol_principal)')
+
+    // FIX: mismo patrón — dos queries separadas para evitar el problema de RLS con joins de PostgREST
+    const { data: actusData } = await sb.from('metas_actualizaciones')
+      .select('*')
       .eq('meta_id', meta.id).order('created_at', { ascending: false })
-    setActus(data || [])
+
+    if (!actusData?.length) { setActus([]); setLoadingA(false); return }
+
+    const uids = [...new Set(actusData.map(a => a.creado_por).filter(Boolean))]
+    let perfilMap = {}
+    if (uids.length) {
+      const { data: perfilesData } = await sb
+        .from('perfiles')
+        .select('id, nombre_completo, rol_principal')
+        .in('id', uids)
+      perfilMap = Object.fromEntries((perfilesData || []).map(p => [p.id, p]))
+    }
+
+    const actusConPerfil = actusData.map(a => ({
+      ...a,
+      perfiles: perfilMap[a.creado_por] || null
+    }))
+
+    setActus(actusConPerfil)
     setLoadingA(false)
   }
 
@@ -197,8 +396,9 @@ function MetaModal({ meta, ninos, rol, onClose, onUpdate, onDelete }) {
     if (!nota.trim()) return
     setLoading(true)
     const sb = createClient()
-    const { data: { user } } = await sb.auth.getUser()
-    await sb.from('metas_actualizaciones').insert({ meta_id: meta.id, progreso_nuevo: progreso, nota: nota.trim(), creado_por: user.id })
+    await sb.from('metas_actualizaciones').insert({
+      meta_id: meta.id, progreso_nuevo: progreso, nota: nota.trim(), creado_por: userId
+    })
     const upd = { progreso }
     if (progreso >= 100) upd.estado = 'lograda'
     await sb.from('metas').update(upd).eq('id', meta.id)
@@ -218,224 +418,303 @@ function MetaModal({ meta, ninos, rol, onClose, onUpdate, onDelete }) {
     onDelete(); onClose()
   }
 
-  const rolLabel = r => ({ padre: 'Padre/Madre', maestra_sombra: 'Maestra', terapeuta: 'Terapeuta' }[r] || r)
-  const lograda = meta.estado === 'lograda'
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col"
-        onClick={e => e.stopPropagation()}>
+    <>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={onClose}>
+        <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col"
+          onClick={e => e.stopPropagation()}>
 
-        {/* ── Hero del modal ── */}
-        <div className="relative rounded-t-3xl sm:rounded-t-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${area.hex}18, ${area.hex}08)` }}>
-          <div className="px-5 pt-5 pb-4">
-            <div className="flex items-start justify-between gap-2 mb-3">
-              <div className="flex flex-wrap gap-1.5">
-                <ChipArea areaKey={meta.area} />
-                <ChipEstado estadoKey={meta.estado} />
-              </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/70 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors shrink-0">
-                <XCircle className="w-4 h-4" />
-              </button>
-            </div>
-
-            <h2 className="font-bold text-slate-900 text-lg leading-snug mb-1">{meta.titulo}</h2>
-            {nino && <p className="text-sm text-slate-500">👦 {nino.nombre} {nino.apellido}</p>}
-
-            {/* Anillo grande + % */}
-            <div className="flex items-center gap-4 mt-4">
-              <div className="relative">
-                <RingProgress pct={meta.progreso ?? 0} color={lograda ? '#22c55e' : area.hex} size={72} stroke={6} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-base font-bold text-slate-800">{meta.progreso ?? 0}%</span>
+          {/* Hero */}
+          <div className="relative rounded-t-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${area.hex}18, ${area.hex}06)` }}>
+            <div className="px-5 pt-5 pb-4">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex flex-wrap gap-1.5">
+                  <ChipArea areaKey={meta.area} />
+                  <ChipEstado estadoKey={meta.estado} />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Botón editar */}
+                  {puedeEditar && meta.estado !== 'lograda' && (
+                    <button onClick={() => setEditando(true)}
+                      className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center text-slate-500 hover:text-primary-600 hover:bg-white transition-colors"
+                      title="Editar meta">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button onClick={onClose}
+                    className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors">
+                    <XCircle className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-slate-400">Progreso actual</p>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">
-                  {meta.fecha_objetivo ? `Meta: ${fmtFecha(meta.fecha_objetivo)}` : 'Sin fecha límite'}
-                </p>
-                {meta.fecha_inicio && <p className="text-xs text-slate-400">Desde {fmtFecha(meta.fecha_inicio)}</p>}
-              </div>
-            </div>
 
-            {/* Celebración lograda */}
-            {lograda && (
-              <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-                <span className="text-2xl">🎉</span>
+              <h2 className="font-bold text-slate-900 text-lg leading-snug mb-1">{meta.titulo}</h2>
+              {nino && <p className="text-sm text-slate-500">👦 {nino.nombre} {nino.apellido}</p>}
+
+              <div className="flex items-center gap-4 mt-4">
+                <div className="relative">
+                  <RingProgress pct={meta.progreso ?? 0} color={lograda ? '#22c55e' : area.hex} size={72} stroke={6} />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-base font-bold text-slate-800">{meta.progreso ?? 0}%</span>
+                  </div>
+                </div>
                 <div>
-                  <p className="text-sm font-bold text-emerald-700">¡Meta lograda!</p>
-                  <p className="text-xs text-emerald-600">El equipo lo hizo posible juntos.</p>
+                  <p className="text-xs text-slate-400">Progreso actual</p>
+                  <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                    {meta.fecha_objetivo ? `Meta: ${fmtFecha(meta.fecha_objetivo)}` : 'Sin fecha límite'}
+                  </p>
+                  {meta.fecha_inicio && <p className="text-xs text-slate-400">Desde {fmtFecha(meta.fecha_inicio)}</p>}
                 </div>
+              </div>
+
+              {lograda && (
+                <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-2xl">🎉</span>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-700">¡Meta lograda!</p>
+                    <p className="text-xs text-emerald-600">El equipo lo hizo posible juntos.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="h-px" style={{ background: `linear-gradient(90deg, transparent, ${area.hex}40, transparent)` }} />
+          </div>
+
+          {/* Cuerpo */}
+          <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+
+            {meta.descripcion && (
+              <div className="bg-slate-50 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Descripción</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{meta.descripcion}</p>
               </div>
             )}
-          </div>
-          {/* Borde inferior decorativo */}
-          <div className="h-px" style={{ background: `linear-gradient(90deg, transparent, ${area.hex}40, transparent)` }} />
-        </div>
 
-        {/* ── Cuerpo scrollable ── */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
-
-          {/* Descripción */}
-          {meta.descripcion && (
-            <div className="bg-slate-50 rounded-2xl px-4 py-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Descripción</p>
-              <p className="text-sm text-slate-700 leading-relaxed">{meta.descripcion}</p>
-            </div>
-          )}
-
-          {/* Actualizar progreso */}
-          {puedeEditar && meta.estado === 'activa' && (
+            {/* Responsables */}
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Registrar avance</p>
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-xs text-slate-500">Nuevo progreso</span>
-                    <span className="text-sm font-bold" style={{ color: area.hex }}>{progreso}%</span>
-                  </div>
-                  <input type="range" min={0} max={100} step={5} value={progreso}
-                    onChange={e => setProgreso(+e.target.value)}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                    style={{ accentColor: area.hex }} />
-                  {/* Mini barra de preview */}
-                  <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progreso}%`, backgroundColor: area.hex }} />
-                  </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <UserCheck className="w-3.5 h-3.5" /> Responsables
+              </p>
+              {meta.responsables?.length ? (
+                <div className="space-y-2">
+                  {meta.responsables.map(r => (
+                    <div key={r.usuario_id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-2.5">
+                      <AvatarInicial nombre={r.nombre} size="w-8 h-8 text-sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{r.nombre}</p>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROL_COLOR[r.rol] || 'bg-slate-100 text-slate-500'}`}>
+                          {ROL_LABEL[r.rol] || r.rol}
+                        </span>
+                      </div>
+                      {r.usuario_id === userId && (
+                        <span className="text-[10px] font-semibold text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full">
+                          Tú
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <textarea value={nota} onChange={e => setNota(e.target.value)} rows={2}
-                  placeholder="Ej: Hoy lo logró con apoyo mínimo en grupo pequeño…"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
-                             focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white" />
-                <Button onClick={guardar} disabled={loading || !nota.trim()} className="w-full gap-2">
-                  {loading ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : '💾'}
-                  {loading ? 'Guardando…' : 'Guardar avance'}
-                </Button>
-              </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-2">
+                  <span className="text-base">⚠️</span>
+                  <p className="text-xs text-amber-700">Esta meta no tiene responsables asignados. Edítala para asignar uno.</p>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Bitácora */}
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Bitácora del equipo</p>
-            {loadingA ? (
-              <div className="flex justify-center py-4">
-                <span className="w-5 h-5 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-              </div>
-            ) : actus.length === 0 ? (
-              <p className="text-xs text-slate-400 italic text-center py-4">Aún no hay actualizaciones registradas.</p>
-            ) : (
-              <div className="space-y-3">
-                {actus.map(a => (
-                  <div key={a.id} className="flex gap-2.5">
-                    <AvatarInicial nombre={a.perfiles?.nombre_completo} />
-                    <div className="flex-1 bg-slate-50 rounded-2xl px-3 py-2.5">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-slate-700">
-                          {a.perfiles?.nombre_completo || 'Equipo'}
-                          <span className="font-normal text-slate-400"> · {rolLabel(a.perfiles?.rol_principal)}</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(a.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">{a.nota}</p>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${a.progreso_nuevo}%`, backgroundColor: area.hex }} />
-                        </div>
-                        <span className="text-[10px] font-semibold text-slate-500">{a.progreso_nuevo}%</span>
-                      </div>
+            {/* Registrar avance */}
+            {puedeActualizar ? (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Registrar avance</p>
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-xs text-slate-500">Nuevo progreso</span>
+                      <span className="text-sm font-bold" style={{ color: area.hex }}>{progreso}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5} value={progreso}
+                      onChange={e => setProgreso(+e.target.value)}
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                      style={{ accentColor: area.hex }} />
+                    <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progreso}%`, backgroundColor: area.hex }} />
                     </div>
                   </div>
-                ))}
+                  <textarea value={nota} onChange={e => setNota(e.target.value)} rows={2}
+                    placeholder="Ej: Hoy lo logró con apoyo mínimo en grupo pequeño…"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
+                               focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white" />
+                  <Button onClick={guardar} disabled={loading || !nota.trim()} className="w-full gap-2">
+                    {loading ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : '💾'}
+                    {loading ? 'Guardando…' : 'Guardar avance'}
+                  </Button>
+                </div>
+              </div>
+            ) : meta.estado === 'activa' && (
+              <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+                <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                <p className="text-xs text-slate-500 leading-snug">
+                  Solo los <span className="font-semibold text-slate-700">responsables asignados</span> pueden registrar avances en esta meta.
+                </p>
+              </div>
+            )}
+
+            {/* Bitácora */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Bitácora del equipo</p>
+              {loadingA ? (
+                <div className="flex justify-center py-4">
+                  <span className="w-5 h-5 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+              ) : actus.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-4">Aún no hay actualizaciones registradas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {actus.map(a => (
+                    <div key={a.id} className="flex gap-2.5">
+                      <AvatarInicial nombre={a.perfiles?.nombre_completo} />
+                      <div className="flex-1 bg-slate-50 rounded-2xl px-3 py-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-slate-700">
+                            {a.perfiles?.nombre_completo || 'Equipo'}
+                            <span className="font-normal text-slate-400"> · {ROL_LABEL[a.perfiles?.rol_principal] || a.perfiles?.rol_principal}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(a.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{a.nota}</p>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${a.progreso_nuevo}%`, backgroundColor: area.hex }} />
+                          </div>
+                          <span className="text-[10px] font-semibold text-slate-500">{a.progreso_nuevo}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Acciones de estado */}
+            {(esPadreOCreador || esResponsable) && (
+              <div className="space-y-2">
+                {meta.estado === 'activa' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => cambiarEstado('pausada')}
+                      className="flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-600
+                                 border border-amber-200 bg-amber-50 rounded-xl py-2.5 hover:bg-amber-100 transition-colors">
+                      <PauseCircle className="w-3.5 h-3.5" /> Pausar meta
+                    </button>
+                    <button onClick={() => cambiarEstado('lograda')}
+                      className="flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-600
+                                 border border-emerald-200 bg-emerald-50 rounded-xl py-2.5 hover:bg-emerald-100 transition-colors">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Marcar lograda
+                    </button>
+                  </div>
+                )}
+                {meta.estado === 'pausada' && (
+                  <button onClick={() => cambiarEstado('activa')}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-600
+                               border border-blue-200 bg-blue-50 rounded-xl py-2.5 hover:bg-blue-100 transition-colors">
+                    <Clock className="w-3.5 h-3.5" /> Reactivar meta
+                  </button>
+                )}
+                {esPadreOCreador && (
+                  <button onClick={eliminar}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-red-400
+                               hover:text-red-600 py-2 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar meta
+                  </button>
+                )}
               </div>
             )}
           </div>
-
-          {/* Acciones de estado */}
-          {puedeEditar && (
-            <div className="space-y-2">
-              {meta.estado === 'activa' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => cambiarEstado('pausada')}
-                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-600
-                               border border-amber-200 bg-amber-50 rounded-xl py-2.5 hover:bg-amber-100 transition-colors">
-                    <PauseCircle className="w-3.5 h-3.5" /> Pausar meta
-                  </button>
-                  <button onClick={() => cambiarEstado('lograda')}
-                    className="flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-600
-                               border border-emerald-200 bg-emerald-50 rounded-xl py-2.5 hover:bg-emerald-100 transition-colors">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Marcar lograda
-                  </button>
-                </div>
-              )}
-              {meta.estado === 'pausada' && (
-                <button onClick={() => cambiarEstado('activa')}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-blue-600
-                             border border-blue-200 bg-blue-50 rounded-xl py-2.5 hover:bg-blue-100 transition-colors">
-                  <Clock className="w-3.5 h-3.5" /> Reactivar meta
-                </button>
-              )}
-              {rol === 'padre' && (
-                <button onClick={eliminar}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-red-400
-                             hover:text-red-600 py-2 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" /> Eliminar meta
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
-    </div>
+
+      {/* Modal de edición encima del detalle */}
+      {editando && (
+        <EditarMetaModal
+          meta={meta}
+          equipo={equipo}
+          onClose={() => setEditando(false)}
+          onSaved={() => { onUpdate(); onClose() }}
+        />
+      )}
+    </>
   )
 }
 
 // ─── Modal nueva meta ─────────────────────────────────────────────────────────
-function NuevaMetaModal({ ninos, onClose, onCreated }) {
-  const [step, setStep]   = useState(1) // 1=área, 2=detalle
-  const [form, setForm]   = useState({ nino_id: ninos.length === 1 ? ninos[0].id : '', area: '', titulo: '', descripcion: '', fecha_objetivo: '' })
+function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState({
+    nino_id: ninos.length === 1 ? ninos[0].id : '',
+    area: '', titulo: '', descripcion: '', fecha_objetivo: '',
+  })
+  // FIX: el creador queda como responsable por defecto desde el inicio
+  const [responsables, setResponsables] = useState([userId])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]     = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const areaSeleccionada = AREA_MAP[form.area]
 
   const guardar = async () => {
     if (!form.nino_id || !form.area || !form.titulo.trim()) { setError('Completa los campos obligatorios.'); return }
     setLoading(true)
     const sb = createClient()
-    const { data: { user } } = await sb.auth.getUser()
-    const { error: err } = await sb.from('metas').insert({
-      nino_id: form.nino_id, area: form.area, titulo: form.titulo.trim(),
-      descripcion: form.descripcion.trim() || null, fecha_inicio: new Date().toISOString().split('T')[0],
-      fecha_objetivo: form.fecha_objetivo || null, estado: 'activa', progreso: 0, creado_por: user.id,
-    })
-    if (err) { setError(err.message); setLoading(false); return }
-    onCreated(); onClose()
-  }
 
-  const areaSeleccionada = AREA_MAP[form.area]
+    const { data: meta, error: err } = await sb.from('metas').insert({
+      nino_id:        form.nino_id,
+      area:           form.area,
+      titulo:         form.titulo.trim(),
+      descripcion:    form.descripcion.trim() || null,
+      fecha_inicio:   new Date().toISOString().split('T')[0],
+      fecha_objetivo: form.fecha_objetivo || null,
+      estado:         'activa',
+      progreso:       0,
+      creado_por:     userId,
+    }).select().single()
+
+    if (err) { setError(err.message); setLoading(false); return }
+
+    // FIX: insertar responsables correctamente y esperar la respuesta
+    if (responsables.length) {
+      const { error: respErr } = await sb.from('metas_responsables').insert(
+        responsables.map(uid => ({ meta_id: meta.id, usuario_id: uid }))
+      )
+      if (respErr) console.error('Error al insertar responsables:', respErr.message)
+    }
+
+    onCreated()
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            {step === 2 && (
-              <button onClick={() => setStep(1)} className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors mr-1">
+            {step > 1 && (
+              <button onClick={() => setStep(s => s - 1)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
                 <ChevronRight className="w-4 h-4 rotate-180" />
               </button>
             )}
             <div>
               <h2 className="font-bold text-slate-900 text-base">Nueva meta</h2>
-              <p className="text-xs text-slate-400">{step === 1 ? 'Paso 1: elige el área de desarrollo' : 'Paso 2: define los detalles'}</p>
+              <p className="text-xs text-slate-400">
+                {step === 1 ? 'Paso 1 · Área de desarrollo'
+                  : step === 2 ? 'Paso 2 · Detalles de la meta'
+                  : 'Paso 3 · Responsables'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
@@ -443,15 +722,15 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
           </button>
         </div>
 
-        {/* Indicador de pasos */}
-        <div className="flex gap-1.5 px-5 pt-3">
-          {[1,2].map(s => (
+        <div className="flex gap-1.5 px-5 pt-3 pb-1">
+          {[1,2,3].map(s => (
             <div key={s} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step >= s ? 'bg-primary-500' : 'bg-slate-200'}`} />
           ))}
         </div>
 
-        <div className="px-5 py-4">
-          {/* Paso 1: área */}
+        <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
+
+          {/* Paso 1: Área */}
           {step === 1 && (
             <div className="space-y-3">
               <p className="text-sm text-slate-600">¿En qué área de desarrollo se enfoca esta meta?</p>
@@ -468,18 +747,15 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
             </div>
           )}
 
-          {/* Paso 2: detalle */}
+          {/* Paso 2: Detalle */}
           {step === 2 && (
             <div className="space-y-3">
-              {/* Área seleccionada */}
               {areaSeleccionada && (
                 <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${areaSeleccionada.bg} border ${areaSeleccionada.border}`}>
                   <span className="text-lg">{areaSeleccionada.emoji}</span>
                   <span className={`text-sm font-semibold ${areaSeleccionada.text}`}>{areaSeleccionada.label}</span>
                 </div>
               )}
-
-              {/* Niño (si hay más de uno) */}
               {ninos.length > 1 && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">Niño *</label>
@@ -491,8 +767,6 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
                   </select>
                 </div>
               )}
-
-              {/* Título */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Título de la meta *</label>
                 <input value={form.titulo} onChange={e => set('titulo', e.target.value)}
@@ -500,8 +774,6 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
                              focus:outline-none focus:ring-2 focus:ring-primary-400" />
               </div>
-
-              {/* Descripción */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                   Descripción <span className="font-normal text-slate-400">(opcional)</span>
@@ -511,8 +783,6 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
                              focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none" />
               </div>
-
-              {/* Fecha */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                   Fecha objetivo <span className="font-normal text-slate-400">(opcional)</span>
@@ -522,12 +792,38 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700
                              focus:outline-none focus:ring-2 focus:ring-primary-400" />
               </div>
+              {error && <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
+              <Button onClick={() => { if (!form.titulo.trim()) { setError('El título es obligatorio.'); return }; setError(''); setStep(3) }}
+                className="w-full gap-2">
+                Siguiente · Asignar responsables <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Paso 3: Responsables */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-slate-700 font-medium mb-1">¿Quién trabajará esta meta?</p>
+                <p className="text-xs text-slate-400">Solo los responsables podrán registrar avances. Todos podrán verla.</p>
+              </div>
+
+              <SelectorResponsables equipo={equipo} seleccionados={responsables} onChange={setResponsables} />
+
+              {responsables.length > 0 && (
+                <div className="bg-primary-50 border border-primary-200 rounded-2xl px-3 py-2.5 flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-primary-500 shrink-0" />
+                  <p className="text-xs text-primary-700 font-medium">
+                    {responsables.length} responsable{responsables.length !== 1 ? 's' : ''} seleccionado{responsables.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              )}
 
               {error && <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
 
-              <Button onClick={guardar} disabled={loading || !form.titulo.trim()} className="w-full gap-2 mt-1">
+              <Button onClick={guardar} disabled={loading} className="w-full gap-2">
                 {loading ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Target className="w-4 h-4" />}
-                {loading ? 'Guardando…' : 'Crear meta'}
+                {loading ? 'Creando meta…' : 'Crear meta'}
               </Button>
             </div>
           )}
@@ -540,12 +836,12 @@ function NuevaMetaModal({ ninos, onClose, onCreated }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function MetasPage() {
   const router = useRouter()
-  const [user, setUser]   = useState(null)
-  const [rol, setRol]     = useState('padre')
-  const [ninos, setNinos] = useState([])
-  const [metas, setMetas] = useState([])
+  const [user, setUser]     = useState(null)
+  const [rol, setRol]       = useState('padre')
+  const [ninos, setNinos]   = useState([])
+  const [equipo, setEquipo] = useState([])
+  const [metas, setMetas]   = useState([])
   const [loading, setLoading] = useState(true)
-
   const [filtroEstado, setFiltroEstado] = useState('activa')
   const [filtroNino, setFiltroNino]     = useState('todos')
   const [metaSel, setMetaSel]           = useState(null)
@@ -559,7 +855,7 @@ export default function MetasPage() {
     if (!u) { router.push('/auth/login'); return }
     setUser(u)
 
-    const { data: perfil } = await sb.from('perfiles').select('rol_principal').eq('id', u.id).maybeSingle()
+    const { data: perfil } = await sb.from('perfiles').select('rol_principal, nombre_completo').eq('id', u.id).maybeSingle()
     const r = perfil?.rol_principal || 'padre'
     setRol(r)
 
@@ -572,6 +868,53 @@ export default function MetasPage() {
       nd = data?.map(e => e.ninos).filter(Boolean) || []
     }
     setNinos(nd)
+
+    // FIX: cargar equipo correctamente para todos los niños del usuario
+    if (nd.length) {
+      const ninoIds = nd.map(n => n.id)
+
+      // Obtener todos los miembros del equipo de esos niños
+      const { data: equipoRows } = await sb
+        .from('equipo_terapeutico')
+        .select('usuario_id, rol, nino_id')
+        .in('nino_id', ninoIds)
+
+      // Obtener perfiles de todos esos usuarios en una sola query
+      const uids = [...new Set((equipoRows || []).map(e => e.usuario_id))]
+
+      // Agregar el usuario actual si no está
+      if (!uids.includes(u.id)) uids.push(u.id)
+
+      const { data: perfilesData } = await sb
+        .from('perfiles')
+        .select('id, nombre_completo, rol_principal')
+        .in('id', uids)
+
+      const perfilMap = Object.fromEntries((perfilesData || []).map(p => [p.id, p]))
+
+      // Construir lista de miembros únicos
+      const vistos = new Set()
+      const miembros = []
+
+      // Siempre incluir al usuario actual primero
+      const miPerfil = perfilMap[u.id]
+      if (miPerfil) {
+        miembros.push({ usuario_id: u.id, nombre: miPerfil.nombre_completo || 'Tú', rol: miPerfil.rol_principal || r })
+        vistos.add(u.id)
+      }
+
+      // Agregar el resto
+      for (const e of (equipoRows || [])) {
+        if (!vistos.has(e.usuario_id)) {
+          const p = perfilMap[e.usuario_id]
+          miembros.push({ usuario_id: e.usuario_id, nombre: p?.nombre_completo || 'Miembro', rol: e.rol })
+          vistos.add(e.usuario_id)
+        }
+      }
+
+      setEquipo(miembros)
+    }
+
     await fetchMetas(nd)
     setLoading(false)
   }
@@ -579,9 +922,46 @@ export default function MetasPage() {
   const fetchMetas = async (nd) => {
     if (!nd?.length) { setMetas([]); return }
     const sb = createClient()
-    const { data } = await sb.from('metas').select('*')
+
+    const { data: metasData } = await sb.from('metas').select('*')
       .in('nino_id', nd.map(n => n.id)).order('created_at', { ascending: false })
-    setMetas(data || [])
+
+    if (!metasData?.length) { setMetas([]); return }
+
+    // FIX: dos queries separadas en lugar del join anidado de PostgREST
+    // que falla con RLS al intentar leer perfiles de otros usuarios
+
+    // Query 1: responsables (solo IDs)
+    const metaIds = metasData.map(m => m.id)
+    const { data: respData } = await sb
+      .from('metas_responsables')
+      .select('meta_id, usuario_id')
+      .in('meta_id', metaIds)
+
+    // Query 2: perfiles de esos usuarios directamente
+    const uids = [...new Set((respData || []).map(r => r.usuario_id))]
+    let perfilMap = {}
+    if (uids.length) {
+      const { data: perfilesData } = await sb
+        .from('perfiles')
+        .select('id, nombre_completo, rol_principal')
+        .in('id', uids)
+      perfilMap = Object.fromEntries((perfilesData || []).map(p => [p.id, p]))
+    }
+
+    // Combinar manualmente
+    const metasConResp = metasData.map(m => ({
+      ...m,
+      responsables: (respData || [])
+        .filter(r => r.meta_id === m.id)
+        .map(r => ({
+          usuario_id: r.usuario_id,
+          nombre: perfilMap[r.usuario_id]?.nombre_completo || 'Miembro',
+          rol:    perfilMap[r.usuario_id]?.rol_principal,
+        }))
+    }))
+
+    setMetas(metasConResp)
   }
 
   const refresh = () => fetchMetas(ninos)
@@ -599,7 +979,7 @@ export default function MetasPage() {
   }), [metas, filtroEstado, filtroNino])
 
   const cnt = useMemo(() => ({
-    activa: metas.filter(m => m.estado === 'activa').length,
+    activa:  metas.filter(m => m.estado === 'activa').length,
     lograda: metas.filter(m => m.estado === 'lograda').length,
     pausada: metas.filter(m => m.estado === 'pausada').length,
   }), [metas])
@@ -610,14 +990,12 @@ export default function MetasPage() {
     return Math.round(activas.reduce((s, m) => s + (m.progreso ?? 0), 0) / activas.length)
   }, [metas])
 
-  const puedeCrear = ['padre','terapeuta'].includes(rol)
-
   if (loading) return (
     <div className="flex min-h-screen bg-slate-50">
       {user && <Navbar user={user} />}
       <main className="flex-1 flex items-center justify-center pt-14 md:pt-0">
         <div className="flex flex-col items-center gap-3">
-          <span className="w-8 h-8 border-3 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+          <span className="w-8 h-8 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
           <p className="text-slate-400 text-sm">Cargando metas…</p>
         </div>
       </main>
@@ -629,7 +1007,6 @@ export default function MetasPage() {
       <Navbar user={user} />
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
 
-        {/* ── Hero con gradiente ── */}
         <div className="bg-gradient-to-br from-primary-600 via-primary-500 to-indigo-600 px-4 pt-8 pb-16 md:px-8">
           <div className="max-w-3xl mx-auto">
             <div className="flex items-start justify-between gap-4">
@@ -641,23 +1018,20 @@ export default function MetasPage() {
                 <h1 className="text-2xl font-bold text-white">Objetivos del equipo</h1>
                 <p className="text-primary-100 text-sm mt-1">Seguimiento de metas terapéuticas y de desarrollo</p>
               </div>
-              {puedeCrear && (
-                <button onClick={() => setMostrarNueva(true)}
-                  className="flex items-center gap-1.5 bg-white text-primary-600 font-semibold text-sm
-                             px-4 py-2.5 rounded-2xl shadow-lg hover:shadow-xl hover:bg-primary-50
-                             transition-all active:scale-95 shrink-0">
-                  <Plus className="w-4 h-4" /> Nueva meta
-                </button>
-              )}
+              <button onClick={() => setMostrarNueva(true)}
+                className="flex items-center gap-1.5 bg-white text-primary-600 font-semibold text-sm
+                           px-4 py-2.5 rounded-2xl shadow-lg hover:shadow-xl hover:bg-primary-50
+                           transition-all active:scale-95 shrink-0">
+                <Plus className="w-4 h-4" /> Nueva meta
+              </button>
             </div>
 
-            {/* Resumen inline en el hero */}
             {metas.length > 0 && (
               <div className="mt-6 grid grid-cols-3 gap-3">
                 {[
-                  { label: 'Activas',  val: cnt.activa,  sub: `${pctGlobal}% promedio`, icon: '🎯' },
-                  { label: 'Logradas', val: cnt.lograda, sub: 'objetivos alcanzados', icon: '🏆' },
-                  { label: 'Pausadas', val: cnt.pausada, sub: 'en espera', icon: '⏸️' },
+                  { label: 'Activas',  val: cnt.activa,  sub: `${pctGlobal}% promedio` },
+                  { label: 'Logradas', val: cnt.lograda, sub: 'objetivos alcanzados' },
+                  { label: 'Pausadas', val: cnt.pausada, sub: 'en espera' },
                 ].map(s => (
                   <div key={s.label} className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-3 text-center">
                     <p className="text-white font-bold text-xl">{s.val}</p>
@@ -670,10 +1044,7 @@ export default function MetasPage() {
           </div>
         </div>
 
-        {/* ── Contenido (sube sobre el hero) ── */}
         <div className="px-4 md:px-8 -mt-8 max-w-3xl mx-auto pb-10">
-
-          {/* Filtros */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 mb-4 flex flex-wrap gap-2">
             {[
               { key: 'activa',  label: '🎯 Activas',  n: cnt.activa },
@@ -683,9 +1054,7 @@ export default function MetasPage() {
             ].map(f => (
               <button key={f.key} onClick={() => setFiltroEstado(f.key)}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
-                  filtroEstado === f.key
-                    ? 'bg-primary-500 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-100'
+                  filtroEstado === f.key ? 'bg-primary-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'
                 }`}>
                 {f.label}
                 {f.n > 0 && (
@@ -705,7 +1074,6 @@ export default function MetasPage() {
             )}
           </div>
 
-          {/* Lista */}
           {ninos.length === 0 ? (
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-10 text-center">
               <p className="text-5xl mb-3">👦</p>
@@ -722,11 +1090,9 @@ export default function MetasPage() {
               <p className="text-sm text-slate-400 mb-5">
                 {filtroEstado === 'activa' ? 'Crea la primera meta del equipo para empezar a dar seguimiento.' : 'Prueba cambiando el filtro.'}
               </p>
-              {puedeCrear && filtroEstado === 'activa' && (
-                <Button onClick={() => setMostrarNueva(true)} className="gap-2">
-                  <Plus className="w-4 h-4" /> Crear primera meta
-                </Button>
-              )}
+              <Button onClick={() => setMostrarNueva(true)} className="gap-2">
+                <Plus className="w-4 h-4" /> Crear primera meta
+              </Button>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -737,7 +1103,6 @@ export default function MetasPage() {
             </div>
           )}
 
-          {/* Link a Progreso */}
           {metas.length > 0 && (
             <Link href="/progreso"
               className="mt-6 flex items-center justify-center gap-2 text-sm font-semibold
@@ -749,11 +1114,14 @@ export default function MetasPage() {
       </main>
 
       {metaSel && (
-        <MetaModal meta={metaSel} ninos={ninos} rol={rol} onClose={() => setMetaSel(null)}
-          onUpdate={() => { refresh(); setMetaSel(null) }} onDelete={refresh} />
+        <MetaModal meta={metaSel} ninos={ninos} equipo={equipo} userId={user?.id} rol={rol}
+          onClose={() => setMetaSel(null)}
+          onUpdate={() => { refresh(); setMetaSel(null) }}
+          onDelete={refresh} />
       )}
       {mostrarNueva && (
-        <NuevaMetaModal ninos={ninos} onClose={() => setMostrarNueva(false)} onCreated={refresh} />
+        <NuevaMetaModal ninos={ninos} equipo={equipo} userId={user?.id}
+          onClose={() => setMostrarNueva(false)} onCreated={refresh} />
       )}
     </div>
   )

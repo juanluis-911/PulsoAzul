@@ -8,18 +8,19 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen , HelpCircle, Target
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
 
 export function Navbar({ user }) {
-  const router = useRouter()
+  const router   = useRouter()
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)   // desktop: colapsar a iconos
-  const [mobileOpen, setMobileOpen] = useState(false) // mobile: drawer
+  const [collapsed, setCollapsed]     = useState(false)
+  const [mobileOpen, setMobileOpen]   = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
+  const [metasActivas, setMetasActivas] = useState(0)   // ← NUEVO
   const { estado, activar, desactivar } = useNotificaciones()
   const { subscription, isActive, openPortal } = useSubscription()
 
@@ -29,8 +30,41 @@ export function Navbar({ user }) {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // Cierra el drawer mobile al navegar
   useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  // ── Cargar conteo de metas activas ────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    const fetchMetasActivas = async () => {
+      const sb = createClient()
+
+      // Obtener niños del usuario (como padre o como equipo)
+      const [{ data: ninosPadre }, { data: equipoData }] = await Promise.all([
+        sb.from('ninos').select('id').eq('padre_id', user.id),
+        sb.from('equipo_terapeutico').select('nino_id').eq('usuario_id', user.id),
+      ])
+
+      const ninoIds = [
+        ...new Set([
+          ...(ninosPadre || []).map(n => n.id),
+          ...(equipoData || []).map(e => e.nino_id),
+        ])
+      ]
+
+      if (!ninoIds.length) return
+
+      const { count } = await sb
+        .from('metas')
+        .select('id', { count: 'exact', head: true })
+        .in('nino_id', ninoIds)
+        .eq('estado', 'activa')
+
+      setMetasActivas(count || 0)
+    }
+
+    fetchMetasActivas()
+  }, [user, pathname]) // se recalcula al navegar
+  // ─────────────────────────────────────────────────────────────────────
 
   const handleInstall = async () => {
     if (!installPrompt) return
@@ -48,14 +82,13 @@ export function Navbar({ user }) {
   }
 
   const navItems = [
-    { href: '/dashboard',       label: 'Inicio',            icon: Home },
-    //{ href: '/registro-diario', label: 'Nuevo Registro',    icon: FileText },
-    { href: '/historial',       label: 'Registros Diarios', icon: BookOpen },
-    { href: '/metas',           label: 'Metas',             icon: Target },
-    { href: '/progreso',        label: 'Progreso',          icon: TrendingUp },
-    { href: '/equipo',          label: 'Red de apoyo',      icon: Users },
-    { href: '/invitar',         label: 'Invitar',           icon: UserPlus },
-    { href: '/ayuda',           label: 'Ayuda',             icon: HelpCircle },
+    { href: '/dashboard', label: 'Inicio',            icon: Home },
+    { href: '/historial', label: 'Registros Diarios', icon: BookOpen },
+    { href: '/metas',     label: 'Metas',             icon: Target,     badge: metasActivas },
+    { href: '/progreso',  label: 'Progreso',           icon: TrendingUp },
+    { href: '/equipo',    label: 'Red de apoyo',       icon: Users },
+    { href: '/invitar',   label: 'Invitar',            icon: UserPlus },
+    { href: '/ayuda',     label: 'Ayuda',              icon: HelpCircle },
   ]
 
   const displayName = user?.user_metadata?.nombre_completo || user?.email || ''
@@ -70,28 +103,25 @@ export function Navbar({ user }) {
         disabled={estado === 'desactivando' || estado === 'solicitando'}
         title={isActive ? 'Desactivar notificaciones' : 'Activar notificaciones'}
         className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-          ${isActive
-            ? 'text-green-600 hover:bg-green-50'
-            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-          } disabled:opacity-50`}
+          ${isActive ? 'text-green-600 hover:bg-green-50' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}
+          disabled:opacity-50`}
       >
         <Bell className="w-5 h-5 shrink-0" />
         {!collapsed && (
           <span className="truncate">
             {isActive
               ? estado === 'desactivando' ? 'Desactivando...' : 'Notif. activas'
-              : estado === 'solicitando' ? 'Activando...' : 'Notificaciones'}
+              : estado === 'solicitando'  ? 'Activando...'    : 'Notificaciones'}
           </span>
         )}
       </button>
     )
   }
 
-  // ── Contenido compartido del sidebar ──────────────────────────────────
   const SidebarContent = ({ mobile = false }) => (
     <div className="flex flex-col h-full">
 
-      {/* Logo + toggle (desktop) */}
+      {/* Logo + toggle */}
       <div className={`flex items-center h-16 px-4 border-b border-slate-100
         ${collapsed && !mobile ? 'justify-center' : 'justify-between'}`}>
         {(!collapsed || mobile) && (
@@ -119,22 +149,47 @@ export function Navbar({ user }) {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon, badge }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
+          const showBadge = badge > 0
           return (
             <Link
               key={href}
               href={href}
               title={collapsed && !mobile ? label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
                 ${active
                   ? 'bg-primary-600 text-white shadow-sm shadow-primary-200'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }
                 ${collapsed && !mobile ? 'justify-center' : ''}`}
             >
-              <Icon className="w-5 h-5 shrink-0" />
-              {(!collapsed || mobile) && <span className="truncate">{label}</span>}
+              {/* Ícono con badge superpuesto cuando está colapsado */}
+              <div className="relative shrink-0">
+                <Icon className="w-5 h-5" />
+                {/* Badge en modo colapsado (sobre el ícono) */}
+                {showBadge && collapsed && !mobile && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5
+                                   bg-red-500 text-white text-[9px] font-bold rounded-full
+                                   flex items-center justify-center leading-none">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </div>
+
+              {/* Label + badge inline cuando está expandido */}
+              {(!collapsed || mobile) && (
+                <>
+                  <span className="truncate flex-1">{label}</span>
+                  {showBadge && (
+                    <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold
+                                     flex items-center justify-center leading-none shrink-0
+                                     ${active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'}`}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </>
+              )}
             </Link>
           )
         })}
@@ -216,19 +271,16 @@ export function Navbar({ user }) {
 
   return (
     <>
-      {/* ── DESKTOP sidebar ─────────────────────────────── */}
+      {/* Desktop sidebar */}
       <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200 shrink-0
         transition-all duration-300 ease-in-out
         ${collapsed ? 'w-[72px]' : 'w-64'}`}>
         <SidebarContent />
       </aside>
 
-      {/* ── MOBILE top bar ──────────────────────────────── */}
+      {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 h-14 flex items-center px-4 gap-3">
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-        >
+        <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100">
           <Menu className="w-5 h-5" />
         </button>
         <Link href="/dashboard" className="flex items-center gap-2">
@@ -237,17 +289,23 @@ export function Navbar({ user }) {
           </div>
           <span className="font-bold text-slate-900">Pulso Azul</span>
         </Link>
+
+        {/* Badge en mobile top bar */}
+        {metasActivas > 0 && (
+          <Link href="/metas" className="ml-auto flex items-center gap-1.5 bg-red-500 text-white
+                                         text-xs font-bold px-2.5 py-1 rounded-full">
+            <Target className="w-3 h-3" />
+            {metasActivas > 99 ? '99+' : metasActivas} meta{metasActivas !== 1 ? 's' : ''}
+          </Link>
+        )}
       </div>
 
-      {/* ── MOBILE drawer ───────────────────────────────── */}
-      {/* Overlay */}
+      {/* Mobile overlay */}
       {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          onClick={() => setMobileOpen(false)}
-        />
+        <div className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
       )}
-      {/* Drawer panel */}
+
+      {/* Mobile drawer */}
       <aside className={`md:hidden fixed top-0 left-0 h-full w-72 z-50 bg-white shadow-xl
         transform transition-transform duration-300 ease-in-out
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
