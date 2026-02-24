@@ -20,7 +20,8 @@ export function Navbar({ user }) {
   const [mobileOpen, setMobileOpen]   = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
-  const [metasActivas, setMetasActivas] = useState(0)   // ← NUEVO
+  const [metasActivas, setMetasActivas] = useState(0)
+  const [perfil, setPerfil] = useState(null)
   const { estado, activar, desactivar } = useNotificaciones()
   const { subscription, isActive, openPortal } = useSubscription()
 
@@ -31,6 +32,19 @@ export function Navbar({ user }) {
   }, [])
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  // ── Cargar perfil del usuario ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    const fetchPerfil = async () => {
+      const sb = createClient()
+      const { data } = await sb.from('perfiles')
+        .select('nombre_completo, rol_principal')
+        .eq('id', user.id).maybeSingle()
+      setPerfil(data)
+    }
+    fetchPerfil()
+  }, [user])
 
   // ── Cargar conteo de metas activas ────────────────────────────────────
   useEffect(() => {
@@ -91,7 +105,9 @@ export function Navbar({ user }) {
     { href: '/ayuda',     label: 'Ayuda',              icon: HelpCircle },
   ]
 
-  const displayName = user?.user_metadata?.nombre_completo || user?.email || ''
+  const displayName = perfil?.nombre_completo || user?.user_metadata?.nombre_completo || user?.email || ''
+  const displayEmail = user?.email || ''
+  const rolLabel = { padre: 'Padre/Madre', maestra_sombra: 'Maestra Sombra', terapeuta: 'Terapeuta' }[perfil?.rol_principal] || 'Usuario'
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   const NotifButton = () => {
@@ -133,8 +149,8 @@ export function Navbar({ user }) {
           </Link>
         )}
         {collapsed && !mobile && (
-          <div className="w-9 h-9">
-            <NextImage src="/pulsoAzulLogo.png" alt="Pulso Azul" width={36} height={36} className="object-contain" priority />
+          <div className="w-14 h-14">
+            <NextImage src="/pulsoAzulLogo.png" alt="Pulso Azul" width={56} height={56} className="object-contain" priority />
           </div>
         )}
         {!mobile && (
@@ -242,16 +258,32 @@ export function Navbar({ user }) {
           </button>
         )}
 
-        {/* Avatar + nombre */}
+        {/* Avatar + nombre + email */}
         {(!collapsed || mobile) && (
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 mt-2">
-            <div className="w-8 h-8 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center shrink-0 ring-2 ring-primary-100">
               {initials || '?'}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-900 truncate">{displayName}</p>
-              <p className="text-xs text-slate-500">Padre/Madre</p>
+              <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{displayName || '—'}</p>
+              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{displayEmail}</p>
+              <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-1 leading-none
+                ${ perfil?.rol_principal === 'padre'          ? 'bg-amber-100 text-amber-700'
+                 : perfil?.rol_principal === 'maestra_sombra' ? 'bg-blue-100 text-blue-700'
+                 : perfil?.rol_principal === 'terapeuta'      ? 'bg-violet-100 text-violet-700'
+                 : 'bg-slate-100 text-slate-500' }`}>
+                {rolLabel}
+              </span>
             </div>
+          </div>
+        )}
+        {/* Avatar colapsado — solo iniciales con tooltip */}
+        {(collapsed && !mobile) && (
+          <div title={`${displayName}\n${displayEmail}`}
+            className="w-9 h-9 rounded-full bg-primary-600 text-white text-sm font-bold
+                       flex items-center justify-center mx-auto cursor-default
+                       ring-2 ring-primary-100">
+            {initials || '?'}
           </div>
         )}
 
