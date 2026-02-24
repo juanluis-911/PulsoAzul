@@ -8,7 +8,8 @@ export function cn(...inputs) {
 
 // Formatear fecha en español
 export function formatearFecha(fecha) {
-  return new Date(fecha).toLocaleDateString('es-MX', {
+  const [year, month, day] = fecha.split('-')
+  return new Date(year, month - 1, day).toLocaleDateString('es-MX', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'

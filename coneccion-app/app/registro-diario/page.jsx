@@ -160,9 +160,12 @@ export default function RegistroDiarioPage() {
   const [ninos, setNinos] = useState([])
 
   // Estado del formulario
+  const hoy = new Date()
+  const fechaLocal = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+
   const [base, setBase] = useState({
     ninoId: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: fechaLocal,  // 👈 usa fecha local, no UTC
     tipoRegistro: 'escuela',
   })
 

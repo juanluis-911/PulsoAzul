@@ -315,6 +315,7 @@ function DetalleDrawer({ r, autor, onClose }) {
                 Registrado por{' '}
                 <span className="font-medium text-slate-600">{autor.nombre_completo}</span>
                 {autor.rol_principal && ` · ${ROL_LABEL[autor.rol_principal] ?? autor.rol_principal}`}
+                
               </p>
             </div>
           )}
