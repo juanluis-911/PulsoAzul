@@ -189,8 +189,8 @@ export default async function DashboardPage() {
   const etiquetaRol = { padre: 'Padre', maestra_sombra: 'Maestra', terapeuta: 'Terapeuta' }[rol] || 'Usuario'
   const saludo = obtenerSaludo()
   const nombreMostrar =
-    perfil?.nombre_completo?.split(' ')[0] ||
-    user.user_metadata?.nombre_completo?.split(' ')[0] ||
+    perfil?.nombre_completo ||
+    user.user_metadata?.nombre_completo ||
     etiquetaRol
 
   const ultimoRegistro = registrosConAutor?.[0]
