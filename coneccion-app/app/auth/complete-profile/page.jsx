@@ -15,12 +15,9 @@ export default function CompleteProfile() {
   const [message, setMessage] = useState({ type: '', text: '' })
   const [user, setUser] = useState(null)
   const [rolAsignado, setRolAsignado] = useState('')
-  const [necesitaPassword, setNecesitaPassword] = useState(false)
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const router = useRouter()
   const supabase = createClient()
-
+  
   useEffect(() => {
     checkUser()
   }, [])
@@ -33,6 +30,7 @@ export default function CompleteProfile() {
       return
     }
 
+    // ✅ .maybeSingle() no lanza error si no existe el perfil
     const { data: profile } = await supabase
       .from('perfiles')
       .select('*')
@@ -46,74 +44,54 @@ export default function CompleteProfile() {
 
     setUser(user)
 
+    // ✅ El rol viene en los metadatos de la invitación
     const rolFromMeta = user.user_metadata?.rol || user.user_metadata?.rol_principal || ''
     setRolAsignado(rolFromMeta)
-
-    // ✅ Detectar si el usuario fue invitado y nunca puso contraseña.
-    // Los usuarios invitados tienen una identity de tipo "email" pero sin
-    // last_sign_in_at en esa identity, o directamente no tienen identities.
-    const emailIdentity = user.identities?.find(i => i.provider === 'email')
-    const sinPassword = !emailIdentity || !emailIdentity.identity_data?.email_verified
-    setNecesitaPassword(sinPassword)
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage({ type: '', text: '' })
+  e.preventDefault()
+  setLoading(true)
+  setMessage({ type: '', text: '' })
 
-    const formData = new FormData(e.target)
+  const formData = new FormData(e.target)
 
-    const profileData = {
-      nombre_completo: formData.get('nombre_completo'),
-      telefono: formData.get('telefono'),
-      rol_principal: rolAsignado || formData.get('rol_principal'),
-    }
-
-    try {
-      // ✅ Si el usuario necesita contraseña, validarla y establecerla primero
-      if (necesitaPassword) {
-        if (password.length < 6) {
-          setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres.' })
-          setLoading(false)
-          return
-        }
-        if (password !== confirmPassword) {
-          setMessage({ type: 'error', text: 'Las contraseñas no coinciden.' })
-          setLoading(false)
-          return
-        }
-
-        const { error: passwordError } = await supabase.auth.updateUser({ password })
-        if (passwordError) throw passwordError
-      }
-
-      // Guardar perfil
-      const { error } = await supabase
-        .from('perfiles')
-        .update(profileData)
-        .eq('id', user.id)
-
-      if (error) {
-        const { error: insertError } = await supabase
-          .from('perfiles')
-          .insert({ id: user.id, ...profileData })
-        if (insertError) throw insertError
-      }
-
-      await supabase.auth.updateUser({
-        data: { nombre_completo: profileData.nombre_completo }
-      })
-
-      setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
-      setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
-
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
-    } finally {
-      setLoading(false)
-    }
+  const profileData = {
+    nombre_completo: formData.get('nombre_completo'),
+    telefono: formData.get('telefono'),
+    rol_principal: rolAsignado || formData.get('rol_principal'),
   }
+
+  try {
+    // ✅ UPDATE en lugar de upsert — el trigger ya creó el registro al registrarse
+    const { error } = await supabase
+      .from('perfiles')
+      .update(profileData)
+      .eq('id', user.id)
+
+    if (error) {
+      // Si falla el update (registro no existe), intentar insert como fallback
+      const { error: insertError } = await supabase
+        .from('perfiles')
+        .insert({ id: user.id, ...profileData })
+
+      if (insertError) throw insertError
+    }
+
+    // Actualizar también user_metadata para consistencia
+    await supabase.auth.updateUser({
+      data: { nombre_completo: profileData.nombre_completo }
+    })
+
+    setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
+    setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
+
+  } catch (error) {
+    setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
+  } finally {
+    setLoading(false)
+  }
+}
 
   if (!user) {
     return (
@@ -178,7 +156,7 @@ export default function CompleteProfile() {
               />
             </div>
 
-            {/* Rol */}
+            {/* ✅ Rol: si viene de invitación se muestra fijo, si no se elige */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Rol</label>
               {rolAsignado ? (
@@ -202,46 +180,6 @@ export default function CompleteProfile() {
                 </select>
               )}
             </div>
-
-            {/* ✅ Campos de contraseña — solo si el usuario no tiene una aún */}
-            {necesitaPassword && (
-              <>
-                <hr className="border-gray-200" />
-                <p className="text-xs text-gray-500">
-                  Como es tu primera vez ingresando, elige una contraseña para tu cuenta.
-                </p>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    Contraseña
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Mínimo 6 caracteres"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                    Confirmar contraseña
-                  </label>
-                  <input
-                    id="confirmPassword"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Repite la contraseña"
-                  />
-                </div>
-              </>
-            )}
 
           </div>
 
