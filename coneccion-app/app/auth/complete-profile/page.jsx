@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const LABELS_ROL = {
   padre: 'Padre/Madre',
@@ -10,7 +10,8 @@ const LABELS_ROL = {
   terapeuta: 'Terapeuta',
 }
 
-export default function CompleteProfile() {
+// Separado en componente interno para poder usar useSearchParams con Suspense
+function CompleteProfileForm() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [user, setUser] = useState(null)
@@ -18,6 +19,7 @@ export default function CompleteProfile() {
   const [rolAsignado, setRolAsignado] = useState('')
   const [needsPassword, setNeedsPassword] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
@@ -38,7 +40,6 @@ export default function CompleteProfile() {
       .eq('id', user.id)
       .maybeSingle()
 
-    // Si el perfil ya está completo, ir al dashboard
     if (profile?.nombre_completo && profile?.rol_principal) {
       router.push('/dashboard')
       return
@@ -47,23 +48,20 @@ export default function CompleteProfile() {
     setUser(user)
     setProfile(profile)
 
-    // El rol viene en los metadatos de la invitación
     const rolFromMeta = user.user_metadata?.rol || user.user_metadata?.rol_principal || ''
     setRolAsignado(rolFromMeta)
 
-    // Detectar si el usuario NO tiene contraseña (vino por invitación)
-    // Los usuarios invitados tienen identities vacías o solo con provider 'email' sin confirmed_at
-    const hasPassword = user.identities?.some(
-      (i) => i.provider === 'email' && i.identity_data?.email_verified
-    )
-    // Alternativa más simple: revisar si el usuario tiene last_sign_in_at reciente (ya existía)
-    // En invitaciones, Supabase no establece contraseña hasta que el usuario la crea
-    const isInvitedWithoutPassword =
-      !hasPassword ||
-      user.user_metadata?.invited_at != null ||
-      (user.identities?.length === 0)
+    // ✅ Detección confiable: el query param 'invited=true' lo pone login/page.jsx
+    // cuando detecta type=invite en el hash. Es la señal más segura.
+    const isInvited = searchParams.get('invited') === 'true'
 
-    setNeedsPassword(isInvitedWithoutPassword)
+    // Fallback adicional: si el usuario no tiene last_sign_in_at previo a ahora
+    // o si su created_at es muy reciente (menos de 5 minutos), probablemente es nuevo
+    const createdAt = new Date(user.created_at).getTime()
+    const now = Date.now()
+    const isNewUser = now - createdAt < 5 * 60 * 1000 // menos de 5 minutos
+
+    setNeedsPassword(isInvited || isNewUser)
   }
 
   const handleSubmit = async (e) => {
@@ -73,7 +71,6 @@ export default function CompleteProfile() {
 
     const formData = new FormData(e.target)
 
-    // Si necesita contraseña, establecerla primero
     if (needsPassword) {
       const password = formData.get('password')
       const confirmPassword = formData.get('confirm_password')
@@ -97,7 +94,6 @@ export default function CompleteProfile() {
       }
     }
 
-    // Construir profileData solo con campos que faltan o que el usuario llenó
     const profileData = {}
 
     const nombreCompleto = formData.get('nombre_completo')
@@ -148,7 +144,6 @@ export default function CompleteProfile() {
     )
   }
 
-  // Campos que ya tiene el perfil (para pre-llenar o mostrar como completos)
   const yaHNombre = !!profile?.nombre_completo
   const yaTieneTelefono = !!profile?.telefono
   const yaTieneRol = !!(profile?.rol_principal || rolAsignado)
@@ -168,7 +163,6 @@ export default function CompleteProfile() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
 
-            {/* Email — siempre deshabilitado */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
@@ -179,7 +173,7 @@ export default function CompleteProfile() {
               />
             </div>
 
-            {/* Contraseña — solo si el usuario no tiene una */}
+            {/* ✅ Contraseña — solo si es usuario invitado/nuevo */}
             {needsPassword && (
               <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-sm text-blue-700 font-medium">Crea una contraseña para tu cuenta</p>
@@ -216,7 +210,6 @@ export default function CompleteProfile() {
               </div>
             )}
 
-            {/* Nombre completo — oculto si ya lo tiene */}
             {!yaHNombre && (
               <div>
                 <label htmlFor="nombre_completo" className="block text-sm font-medium text-gray-700">
@@ -234,7 +227,6 @@ export default function CompleteProfile() {
               </div>
             )}
 
-            {/* Teléfono — oculto si ya lo tiene */}
             {!yaTieneTelefono && (
               <div>
                 <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
@@ -250,7 +242,6 @@ export default function CompleteProfile() {
               </div>
             )}
 
-            {/* Rol — oculto si ya lo tiene o viene de invitación */}
             {!yaTieneRol && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">Rol</label>
@@ -268,7 +259,6 @@ export default function CompleteProfile() {
               </div>
             )}
 
-            {/* Si el rol viene de invitación, mostrarlo como readonly */}
             {rolAsignado && !profile?.rol_principal && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">Rol</label>
@@ -301,5 +291,17 @@ export default function CompleteProfile() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function CompleteProfile() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <CompleteProfileForm />
+    </Suspense>
   )
 }

@@ -60,10 +60,10 @@ export default function LoginPage() {
 
         console.log('Sesión establecida:', data.session.user.email)
 
-        // ✅ Si es invitación, siempre ir a complete-profile (nunca al dashboard)
-        // El usuario recién invitado nunca tiene perfil completo
+        // ✅ Si es invitación, pasar ?invited=true para que complete-profile
+        // sepa que debe pedir contraseña
         if (type === 'invite') {
-          router.push('/auth/complete-profile')
+          router.push('/auth/complete-profile?invited=true')
           return
         }
 
