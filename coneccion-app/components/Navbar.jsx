@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target 
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -96,13 +96,14 @@ export function Navbar({ user }) {
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Inicio',            icon: Home },
-    { href: '/historial', label: 'Registros Diarios', icon: BookOpen },
-    { href: '/metas',     label: 'Metas',             icon: Target,     badge: metasActivas },
-    { href: '/progreso',  label: 'Progreso',           icon: TrendingUp },
-    { href: '/equipo',    label: 'Red de apoyo',       icon: Users },
-    { href: '/invitar',   label: 'Invitar',            icon: UserPlus },
-    { href: '/ayuda',     label: 'Ayuda',              icon: HelpCircle },
+    { href: '/dashboard',       label: 'Inicio',                icon: Home },
+    { href: '/historial',       label: 'Registros Diarios',     icon: BookOpen },
+    { href: '/metas',           label: 'Metas',                 icon: Target,     badge: metasActivas },
+    { href: '/progreso',        label: 'Progreso',              icon: TrendingUp },
+    { href: '/equipo',          label: 'Red de apoyo',          icon: Users },
+    { href: '/reporte-medico',  label: 'Reporte para Médicos',  icon: FileText }, 
+    { href: '/invitar',         label: 'Invitar',               icon: UserPlus },
+    { href: '/ayuda',           label: 'Ayuda',                 icon: HelpCircle },
   ]
 
   const displayName = perfil?.nombre_completo || user?.user_metadata?.nombre_completo || user?.email || ''

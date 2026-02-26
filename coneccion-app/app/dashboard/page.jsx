@@ -170,7 +170,7 @@ export default async function DashboardPage() {
 
   const { data: registrosRecientes } = await supabase
     .from('registros_diarios')
-    .select('id, fecha, estado_animo, actividades, logros, desafios, notas, tipo_registro, creado_por, ninos (nombre, apellido)')
+    .select('id, fecha, estado_animo, actividades, logros, desafios, notas, tipo_registro, creado_por, metricas, ninos (nombre, apellido)')
     .in('nino_id', ninos.length ? ninos.map(n => n.id) : [''])
     .order('created_at', { ascending: false })  
     .order('fecha', { ascending: false })
