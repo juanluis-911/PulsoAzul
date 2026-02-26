@@ -172,8 +172,8 @@ export default async function DashboardPage() {
     .from('registros_diarios')
     .select('id, fecha, estado_animo, actividades, logros, desafios, notas, tipo_registro, creado_por, ninos (nombre, apellido)')
     .in('nino_id', ninos.length ? ninos.map(n => n.id) : [''])
-    .order('fecha', { ascending: false })
     .order('created_at', { ascending: false })  
+    .order('fecha', { ascending: false })
     .limit(5)
 
   const autorIds = [...new Set(registrosRecientes?.map(r => r.creado_por).filter(Boolean))]

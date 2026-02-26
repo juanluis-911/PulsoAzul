@@ -14,10 +14,12 @@ export default function CompleteProfile() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [rolAsignado, setRolAsignado] = useState('')
+  const [needsPassword, setNeedsPassword] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-  
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -30,68 +32,110 @@ export default function CompleteProfile() {
       return
     }
 
-    // ✅ .maybeSingle() no lanza error si no existe el perfil
     const { data: profile } = await supabase
       .from('perfiles')
       .select('*')
       .eq('id', user.id)
       .maybeSingle()
 
+    // Si el perfil ya está completo, ir al dashboard
     if (profile?.nombre_completo && profile?.rol_principal) {
       router.push('/dashboard')
       return
     }
 
     setUser(user)
+    setProfile(profile)
 
-    // ✅ El rol viene en los metadatos de la invitación
+    // El rol viene en los metadatos de la invitación
     const rolFromMeta = user.user_metadata?.rol || user.user_metadata?.rol_principal || ''
     setRolAsignado(rolFromMeta)
+
+    // Detectar si el usuario NO tiene contraseña (vino por invitación)
+    // Los usuarios invitados tienen identities vacías o solo con provider 'email' sin confirmed_at
+    const hasPassword = user.identities?.some(
+      (i) => i.provider === 'email' && i.identity_data?.email_verified
+    )
+    // Alternativa más simple: revisar si el usuario tiene last_sign_in_at reciente (ya existía)
+    // En invitaciones, Supabase no establece contraseña hasta que el usuario la crea
+    const isInvitedWithoutPassword =
+      !hasPassword ||
+      user.user_metadata?.invited_at != null ||
+      (user.identities?.length === 0)
+
+    setNeedsPassword(isInvitedWithoutPassword)
   }
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  setLoading(true)
-  setMessage({ type: '', text: '' })
+    e.preventDefault()
+    setLoading(true)
+    setMessage({ type: '', text: '' })
 
-  const formData = new FormData(e.target)
+    const formData = new FormData(e.target)
 
-  const profileData = {
-    nombre_completo: formData.get('nombre_completo'),
-    telefono: formData.get('telefono'),
-    rol_principal: rolAsignado || formData.get('rol_principal'),
-  }
+    // Si necesita contraseña, establecerla primero
+    if (needsPassword) {
+      const password = formData.get('password')
+      const confirmPassword = formData.get('confirm_password')
 
-  try {
-    // ✅ UPDATE en lugar de upsert — el trigger ya creó el registro al registrarse
-    const { error } = await supabase
-      .from('perfiles')
-      .update(profileData)
-      .eq('id', user.id)
+      if (password !== confirmPassword) {
+        setMessage({ type: 'error', text: 'Las contraseñas no coinciden' })
+        setLoading(false)
+        return
+      }
+      if (password.length < 6) {
+        setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' })
+        setLoading(false)
+        return
+      }
 
-    if (error) {
-      // Si falla el update (registro no existe), intentar insert como fallback
-      const { error: insertError } = await supabase
-        .from('perfiles')
-        .insert({ id: user.id, ...profileData })
-
-      if (insertError) throw insertError
+      const { error: pwError } = await supabase.auth.updateUser({ password })
+      if (pwError) {
+        setMessage({ type: 'error', text: 'Error al establecer contraseña: ' + pwError.message })
+        setLoading(false)
+        return
+      }
     }
 
-    // Actualizar también user_metadata para consistencia
-    await supabase.auth.updateUser({
-      data: { nombre_completo: profileData.nombre_completo }
-    })
+    // Construir profileData solo con campos que faltan o que el usuario llenó
+    const profileData = {}
 
-    setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
-    setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
+    const nombreCompleto = formData.get('nombre_completo')
+    if (nombreCompleto) profileData.nombre_completo = nombreCompleto
 
-  } catch (error) {
-    setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
-  } finally {
-    setLoading(false)
+    const telefono = formData.get('telefono')
+    if (telefono) profileData.telefono = telefono
+
+    const rol = rolAsignado || formData.get('rol_principal')
+    if (rol) profileData.rol_principal = rol
+
+    try {
+      const { error } = await supabase
+        .from('perfiles')
+        .update(profileData)
+        .eq('id', user.id)
+
+      if (error) {
+        const { error: insertError } = await supabase
+          .from('perfiles')
+          .insert({ id: user.id, ...profileData })
+        if (insertError) throw insertError
+      }
+
+      if (profileData.nombre_completo) {
+        await supabase.auth.updateUser({
+          data: { nombre_completo: profileData.nombre_completo }
+        })
+      }
+
+      setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
+      setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   if (!user) {
     return (
@@ -103,6 +147,11 @@ export default function CompleteProfile() {
       </div>
     )
   }
+
+  // Campos que ya tiene el perfil (para pre-llenar o mostrar como completos)
+  const yaHNombre = !!profile?.nombre_completo
+  const yaTieneTelefono = !!profile?.telefono
+  const yaTieneRol = !!(profile?.rol_principal || rolAsignado)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -119,6 +168,7 @@ export default function CompleteProfile() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
 
+            {/* Email — siempre deshabilitado */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
@@ -129,44 +179,81 @@ export default function CompleteProfile() {
               />
             </div>
 
-            <div>
-              <label htmlFor="nombre_completo" className="block text-sm font-medium text-gray-700">
-                Nombre completo
-              </label>
-              <input
-                id="nombre_completo"
-                name="nombre_completo"
-                type="text"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ej: Juan Pérez"
-              />
-            </div>
+            {/* Contraseña — solo si el usuario no tiene una */}
+            {needsPassword && (
+              <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-700 font-medium">Crea una contraseña para tu cuenta</p>
 
-            <div>
-              <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
-                Teléfono
-              </label>
-              <input
-                id="telefono"
-                name="telefono"
-                type="tel"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ej: +52 123 456 7890"
-              />
-            </div>
-
-            {/* ✅ Rol: si viene de invitación se muestra fijo, si no se elige */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Rol</label>
-              {rolAsignado ? (
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="block w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-100 text-gray-700">
-                    {LABELS_ROL[rolAsignado] || rolAsignado}
-                  </span>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">Asignado por invitación</span>
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Contraseña
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Mínimo 6 caracteres"
+                  />
                 </div>
-              ) : (
+
+                <div>
+                  <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700">
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    id="confirm_password"
+                    name="confirm_password"
+                    type="password"
+                    required
+                    minLength={6}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Repite tu contraseña"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Nombre completo — oculto si ya lo tiene */}
+            {!yaHNombre && (
+              <div>
+                <label htmlFor="nombre_completo" className="block text-sm font-medium text-gray-700">
+                  Nombre completo
+                </label>
+                <input
+                  id="nombre_completo"
+                  name="nombre_completo"
+                  type="text"
+                  required
+                  defaultValue={user.user_metadata?.nombre_completo || ''}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Juan Pérez"
+                />
+              </div>
+            )}
+
+            {/* Teléfono — oculto si ya lo tiene */}
+            {!yaTieneTelefono && (
+              <div>
+                <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
+                  Teléfono
+                </label>
+                <input
+                  id="telefono"
+                  name="telefono"
+                  type="tel"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: +52 123 456 7890"
+                />
+              </div>
+            )}
+
+            {/* Rol — oculto si ya lo tiene o viene de invitación */}
+            {!yaTieneRol && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Rol</label>
                 <select
                   id="rol_principal"
                   name="rol_principal"
@@ -178,8 +265,21 @@ export default function CompleteProfile() {
                   <option value="maestra_sombra">Maestra Sombra</option>
                   <option value="terapeuta">Terapeuta</option>
                 </select>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Si el rol viene de invitación, mostrarlo como readonly */}
+            {rolAsignado && !profile?.rol_principal && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Rol</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="block w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-100 text-gray-700">
+                    {LABELS_ROL[rolAsignado] || rolAsignado}
+                  </span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">Asignado por invitación</span>
+                </div>
+              </div>
+            )}
 
           </div>
 
