@@ -19,104 +19,76 @@ export default function LoginPage() {
 
   useEffect(() => {
     const processAuthCallback = async () => {
+      const hash = window.location.hash
       console.log('URL actual:', window.location.href)
-      console.log('Hash:', window.location.hash)
+      console.log('Hash:', hash)
 
-      // Verificar si hay un fragmento con token
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        console.log('Token detectado, procesando...')
-        
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        if (hashParams.get('type') === 'recovery') {
-          router.push('/auth/reset-password' + window.location.hash)
+      // Si no hay hash con token, mostrar el formulario normalmente
+      if (!hash || !hash.includes('access_token')) {
+        console.log('No hay token en la URL')
+        setInitialLoading(false)
+        return
+      }
+
+      console.log('Token detectado, procesando...')
+      const hashParams = new URLSearchParams(hash.substring(1))
+      const type         = hashParams.get('type')
+      const accessToken  = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token') || ''
+
+      // Recovery → redirigir a reset-password
+      if (type === 'recovery') {
+        router.push('/auth/reset-password' + hash)
+        return
+      }
+
+      try {
+        // ✅ Siempre establecer la sesión con los tokens del hash
+        // (no usar getSession primero, ya que puede no tener la sesión del invite aún)
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+
+        if (sessionError) throw sessionError
+
+        if (!data.session) {
+          setError('No se pudo establecer la sesión. El enlace puede haber expirado.')
+          setInitialLoading(false)
           return
         }
-        try {
-          // Método 1: Intentar con getSession (más confiable)
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-          
-          if (sessionError) {
-            console.error('Error getSession:', sessionError)
-            throw sessionError
-          }
-          
-          if (session) {
-            console.log('Sesión establecida:', session.user.email)
-            
-            // Verificar perfil
-            const { data: profile, error: profileError } = await supabase
-              .from('perfiles')
-              .select('nombre_completo, rol_principal')
-              .eq('id', session.user.id)
-              .maybeSingle()
 
-            if (profileError) {
-              console.error('Error verificando perfil:', profileError)
-            }
+        console.log('Sesión establecida:', data.session.user.email)
 
-            // Redirigir según el perfil
-            if (profile?.nombre_completo && profile?.rol_principal) {
-              router.push('/dashboard')
-            } else {
-              router.push('/auth/complete-profile')
-            }
-            return
-          }
-
-          // Si no hay sesión, intentar método alternativo
-          console.log('No hay sesión, intentando método alternativo...')
-          
-          // Extraer tokens del hash manualmente
-          const hashParams = new URLSearchParams(
-            window.location.hash.substring(1) // Quitar el #
-          )
-          
-          const accessToken = hashParams.get('access_token')
-          const refreshToken = hashParams.get('refresh_token')
-          
-          if (accessToken) {
-            console.log('Tokens encontrados en hash, estableciendo sesión...')
-            
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || ''
-            })
-            
-            if (error) throw error
-            
-            if (data.session) {
-              // Verificar perfil
-              const { data: profile } = await supabase
-                .from('perfiles')
-                .select('nombre_completo, rol_principal')
-                .eq('id', data.session.user.id)
-                .maybeSingle()
-
-              if (profile?.nombre_completo && profile?.rol_principal) {
-                router.push('/dashboard')
-              } else {
-                router.push('/auth/complete-profile')
-              }
-              return
-            }
-          }
-          
-          // Si llegamos aquí, algo salió mal
-          setError('No se pudo procesar la autenticación automática')
-        } catch (error) {
-          console.error('Error procesando autenticación:', error)
-          setError('Error al procesar la autenticación: ' + error.message)
-        } finally {
-          setInitialLoading(false)
+        // ✅ Si es invitación, siempre ir a complete-profile (nunca al dashboard)
+        // El usuario recién invitado nunca tiene perfil completo
+        if (type === 'invite') {
+          router.push('/auth/complete-profile')
+          return
         }
-      } else {
-        console.log('No hay token en la URL')
+
+        // Para magic link u otros tipos, verificar si el perfil ya está completo
+        const { data: profile } = await supabase
+          .from('perfiles')
+          .select('nombre_completo, rol_principal')
+          .eq('id', data.session.user.id)
+          .maybeSingle()
+
+        if (profile?.nombre_completo && profile?.rol_principal) {
+          router.push('/dashboard')
+        } else {
+          router.push('/auth/complete-profile')
+        }
+
+      } catch (err) {
+        console.error('Error procesando autenticación:', err)
+        setError('Error al procesar la autenticación: ' + err.message)
         setInitialLoading(false)
       }
     }
 
     processAuthCallback()
-  }, [router, supabase])
+  }, []) // ✅ Sin dependencias — solo corre al montar
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -134,7 +106,7 @@ export default function LoginPage() {
       return
     }
 
-    // Verificar perfil después del login
+    // Verificar perfil después del login normal
     try {
       const { data: profile } = await supabase
         .from('perfiles')
@@ -148,8 +120,8 @@ export default function LoginPage() {
         router.push('/auth/complete-profile')
       }
       router.refresh()
-    } catch (error) {
-      console.error('Error verificando perfil:', error)
+    } catch (err) {
+      console.error('Error verificando perfil:', err)
       router.push('/dashboard')
       router.refresh()
     }
@@ -173,10 +145,10 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex justify-center mb-4">
-              <NextImage 
-                src="/pulsoAzulLogo.png" 
-                alt="Pulso Azul" 
-                width={120} 
+              <NextImage
+                src="/pulsoAzulLogo.png"
+                alt="Pulso Azul"
+                width={120}
                 height={40}
                 className="object-contain"
                 priority
@@ -213,9 +185,9 @@ export default function LoginPage() {
               disabled={loading}
             />
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loading}
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}

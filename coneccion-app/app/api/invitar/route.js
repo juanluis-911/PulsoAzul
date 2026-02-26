@@ -23,17 +23,14 @@ export async function POST(request) {
       )
     }
 
-    // ✅ Primero verificar si el usuario ya existe en auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
     const existingUser = existingUsers?.users?.find(u => u.email === email)
 
     let userId
 
     if (existingUser) {
-      // El usuario ya tiene cuenta — solo lo agregamos al equipo, sin reenviar invitación
       userId = existingUser.id
     } else {
-      // Usuario nuevo — invitar por email
       const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
         email,
         {
@@ -43,7 +40,8 @@ export async function POST(request) {
             permisos: permisos,
             rol_principal: rol,
           },
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+          // ✅ FIX: apuntar a /auth/login que ya sabe leer el hash con el token
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/login`,
         }
       )
 
@@ -55,7 +53,6 @@ export async function POST(request) {
       userId = inviteData.user.id
     }
 
-    // ✅ Agregar al equipo terapéutico (upsert para evitar duplicados)
     const { error: equipoError } = await supabaseAdmin
       .from('equipo_terapeutico')
       .upsert(

@@ -76,7 +76,10 @@ export async function middleware(request) {
 
   // ── Rutas de auth → redirigir al dashboard si ya está autenticado ─────────
   if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/register')) {
-    if (user) {
+    const hasInviteParam = request.nextUrl.searchParams.has('invited')
+    const hasErrorParam = request.nextUrl.searchParams.has('error')
+
+    if (user && !hasInviteParam && !hasErrorParam) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
