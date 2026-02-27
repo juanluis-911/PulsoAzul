@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
-import { ArrowLeft, UserPlus, FileText, TrendingUp } from 'lucide-react'
+import { ArrowLeft, UserPlus, FileText, TrendingUp, MessageCircle } from 'lucide-react'
 import { formatearFecha, calcularEdad, ESTADOS_ANIMO } from '@/lib/utils'
 import { EditarNinoBtn } from '@/components/EditarNinoBtn'
 
@@ -275,7 +275,26 @@ export default async function NinoPerfilPage({ params }) {
 
             {/* Columna lateral */}
             <div className="space-y-4">
+              {/* Acciones rápidas */}
+              <Seccion titulo="Acciones rápidas">
+                <div className="space-y-1">
+                  {[
+                    { href: '/registro-diario', Icon: FileText,   label: 'Nuevo registro',  bg: 'bg-blue-50',   ic: 'text-blue-600' },
+                    { href: '/progreso',        Icon: TrendingUp,  label: 'Ver progreso',    bg: 'bg-green-50',  ic: 'text-green-600' },
+                    { href: `/mensajes/${nino.id}`, Icon: MessageCircle, label: 'Chat del equipo', bg: 'bg-indigo-50', ic: 'text-indigo-600' },
 
+                    ...(esPadre ? [{ href: '/invitar', Icon: UserPlus, label: 'Invitar al equipo', bg: 'bg-violet-50', ic: 'text-violet-600' }] : []),
+                  ].map(({ href, Icon, label, bg, ic }) => (
+                    <Link key={href} href={href}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                      <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
+                        <Icon className={`w-4 h-4 ${ic}`} />
+                      </div>
+                      <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </Seccion>
               {/* Equipo */}
               <Seccion
                 titulo="Equipo"
@@ -305,25 +324,6 @@ export default async function NinoPerfilPage({ params }) {
                     BtnIcon={UserPlus}
                   />
                 )}
-              </Seccion>
-
-              {/* Acciones rápidas */}
-              <Seccion titulo="Acciones rápidas">
-                <div className="space-y-1">
-                  {[
-                    { href: '/registro-diario', Icon: FileText,   label: 'Nuevo registro',  bg: 'bg-blue-50',   ic: 'text-blue-600' },
-                    { href: '/progreso',        Icon: TrendingUp,  label: 'Ver progreso',    bg: 'bg-green-50',  ic: 'text-green-600' },
-                    ...(esPadre ? [{ href: '/invitar', Icon: UserPlus, label: 'Invitar al equipo', bg: 'bg-violet-50', ic: 'text-violet-600' }] : []),
-                  ].map(({ href, Icon, label, bg, ic }) => (
-                    <Link key={href} href={href}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-                      <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
-                        <Icon className={`w-4 h-4 ${ic}`} />
-                      </div>
-                      <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</span>
-                    </Link>
-                  ))}
-                </div>
               </Seccion>
 
             </div>

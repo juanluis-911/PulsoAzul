@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/Navbar'
-import { Button } from '@/components/ui/Button'
-import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle } from 'lucide-react'
 import { obtenerSaludo, formatearFecha, calcularEdad, ESTADOS_ANIMO } from '@/lib/utils'
 import { RegistroCard } from '@/components/RegistroCard'
+
 
 // ─── Componente: avatar con iniciales ────────────────────────────────────────
 function AvatarInicial({ nombre, className = '' }) {
@@ -246,6 +247,14 @@ export default async function DashboardPage() {
 
           {/* ── Acciones rápidas ──────────────────────────────────────────── */}
           <div className={`flex gap-3 mb-6 ${rol === 'padre' ? '' : 'justify-center'}`}>
+            <AccionCard
+              href="/mensajes"
+              icon={MessageCircle}
+              label="Mensajes"
+              sublabel="Chat del equipo"
+              iconBg="bg-indigo-50"
+              iconColor="text-indigo-600"
+            />
             <AccionCard
               href="/registro-diario"
               icon={FileText}

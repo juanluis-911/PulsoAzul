@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target 
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -24,6 +24,7 @@ export function Navbar({ user }) {
   const [perfil, setPerfil] = useState(null)
   const { estado, activar, desactivar } = useNotificaciones()
   const { subscription, isActive, openPortal } = useSubscription()
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true) }
@@ -79,6 +80,36 @@ export function Navbar({ user }) {
     fetchMetasActivas()
   }, [user, pathname]) // se recalcula al navegar
   // ─────────────────────────────────────────────────────────────────────
+  // ── Cargar mensajes no leídos ─────────────────────────────────────────
+useEffect(() => {
+  if (!user) return
+  const fetchNoLeidos = async () => {
+    const sb = createClient()
+
+    const [{ data: ninosPadre }, { data: equipoData }] = await Promise.all([
+      sb.from('ninos').select('id').eq('padre_id', user.id),
+      sb.from('equipo_terapeutico').select('nino_id').eq('usuario_id', user.id),
+    ])
+
+    const ninoIds = [...new Set([
+      ...(ninosPadre || []).map(n => n.id),
+      ...(equipoData || []).map(e => e.nino_id),
+    ])]
+
+    if (!ninoIds.length) { setMensajesNoLeidos(0); return }
+
+    const { count } = await sb
+      .from('mensajes')
+      .select('id', { count: 'exact', head: true })
+      .in('nino_id', ninoIds)
+      .neq('autor_id', user.id)
+      .not('leido_por', 'cs', `{${user.id}}`)
+
+    setMensajesNoLeidos(count || 0)
+  }
+
+  fetchNoLeidos()
+}, [user, pathname])
 
   const handleInstall = async () => {
     if (!installPrompt) return
@@ -98,6 +129,7 @@ export function Navbar({ user }) {
   const navItems = [
     { href: '/dashboard',       label: 'Inicio',                icon: Home },
     { href: '/historial',       label: 'Registros Diarios',     icon: BookOpen },
+    { href: '/mensajes',        label: 'Mensajes',              icon: MessageCircle, badge: mensajesNoLeidos },
     { href: '/metas',           label: 'Metas',                 icon: Target,     badge: metasActivas },
     { href: '/progreso',        label: 'Progreso',              icon: TrendingUp },
     { href: '/equipo',          label: 'Red de apoyo',          icon: Users },
@@ -322,7 +354,17 @@ export function Navbar({ user }) {
           </div>
           <span className="font-bold text-slate-900">Pulso Azul</span>
         </Link>
-
+        {mensajesNoLeidos > 0 && (
+          <Link href="/mensajes" className="ml-auto relative p-2 rounded-xl hover:bg-slate-100 transition-colors group">
+            <MessageCircle className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full
+                            bg-red-500 text-white text-[10px] font-bold flex items-center
+                            justify-center leading-none ring-2 ring-white">
+              {mensajesNoLeidos > 9 ? '9+' : mensajesNoLeidos}
+              <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75" />
+            </span>
+          </Link>
+        )}
         {/* Badge en mobile top bar */}
         {metasActivas > 0 && (
           <Link href="/metas" className="ml-auto flex items-center gap-1.5 bg-red-500 text-white
