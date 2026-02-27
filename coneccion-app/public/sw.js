@@ -62,18 +62,16 @@ self.addEventListener('push', (e) => {
     icon:    data.icon    || '/icon-192x192.png',
     badge:   data.badge   || '/badge-72x72.png',
     vibrate: [200, 100, 200],
-    tag:     data.tag     || 'pulso-azul-notif', // agrupa notificaciones del mismo tipo
-    renotify: true,                              // vibrar aunque el tag sea igual
-    data: {
-      url: data.url || '/',
-    },
-    actions: data.actions || [],
+    tag:     data.tag     || 'pulso-azul-notif',
+    renotify: true,
+    requireInteraction: true,  // ← agrega esto
+    data: { url: data.url || '/' },
   }
 
-  e.waitUntil(
-    self.registration.showNotification(data.title || 'Pulso Azul', options)
-  )
-})
+    e.waitUntil(
+      self.registration.showNotification(data.title || 'Pulso Azul', options)
+    )
+  })
 
 // ── Notification click: navegar a la URL correcta ────────────────────────────
 self.addEventListener('notificationclick', (e) => {
