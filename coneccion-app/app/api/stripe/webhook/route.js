@@ -68,7 +68,7 @@ export async function POST(request) {
           id:                    userId,
           stripe_customer_id:    session.customer,
           stripe_subscription_id: subscription.id,
-          status:                'active',
+          status: subscription.status === 'trialing' ? 'trialing' : 'active',
           plan,
           current_period_end:    getPeriodEnd(subscription),
           cancel_at_period_end:  subscription.cancel_at_period_end,

@@ -69,6 +69,7 @@ export async function POST(request) {
       success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?checkout=success`,
       cancel_url:  `${process.env.NEXT_PUBLIC_URL}/pricing?checkout=canceled`,
       subscription_data: {
+        trial_period_days: 30,
         metadata: { supabase_user_id: user.id, plan },
       },
       // Permite al usuario ver un resumen antes de pagar
