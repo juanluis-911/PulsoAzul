@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import NextImage from 'next/image'
 import { Button } from '@/components/ui/Button'
-import { Analytics } from "@vercel/analytics/next"
+
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -194,7 +194,6 @@ function Navbar() {
               Comenzar gratis ✦
             </Button>
           </Link>
-          <Analytics />
         </div>
       </nav>
     </header>
