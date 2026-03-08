@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import NextImage from 'next/image'  // ← Cambiar
+import NextImage from 'next/image'
 
 export default function RegistroPage() {
   const router = useRouter()
@@ -31,7 +31,6 @@ export default function RegistroPage() {
     setLoading(true)
     setError('')
 
-    // Validaciones
     if (formData.password !== formData.confirmPassword) {
       setError('Las contraseñas no coinciden')
       setLoading(false)
@@ -63,8 +62,9 @@ export default function RegistroPage() {
       return
     }
 
-    // Redirigir al dashboard
-    router.push('/dashboard')
+    // ✅ CAMBIO: Redirigir a pricing para que el usuario active su trial
+    // El primer mes es GRATIS, pero requiere tarjeta
+    router.push('/pricing?welcome=true')
     router.refresh()
   }
 
@@ -82,7 +82,6 @@ export default function RegistroPage() {
                   height={40}
                   className="object-contain"
                 />
-                {/* Puedes quitar el texto "Pulso Azul" si ya está en el logo */}
               </div>
               <span className="text-2xl font-bold text-slate-900">Pulso Azul</span>
             </Link>

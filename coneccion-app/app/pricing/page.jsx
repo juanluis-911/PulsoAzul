@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, Tag, Copy, CheckCheck, Zap, Shield, Clock } from 'lucide-react'
+import { Check, Tag, Copy, CheckCheck, Zap, Shield, Clock, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 const PLANS = [
@@ -47,7 +47,8 @@ const PLANS = [
 const PERKS = [
   { icon: Shield, label: 'Pago 100% seguro' },
   { icon: Clock, label: 'Cancela cuando quieras' },
-  { icon: Zap, label: 'Acceso inmediato' },
+  { icon: Zap,   label: 'Acceso inmediato' },
+  { icon: Gift,  label: '30 días gratis' },
 ]
 
 function CouponBadge({ coupon, label }) {
@@ -85,6 +86,24 @@ function CouponBadge({ coupon, label }) {
   )
 }
 
+// ✅ NUEVO: Banner de bienvenida cuando viene de registro
+function WelcomeBanner() {
+  const searchParams = useSearchParams()
+  const isWelcome = searchParams.get('welcome') === 'true'
+  if (!isWelcome) return null
+
+  return (
+    <div className="mb-8 bg-green-50 border border-green-200 text-green-800 rounded-xl p-5 text-center">
+      <p className="text-lg font-bold mb-1">🎉 ¡Cuenta creada con éxito!</p>
+      <p className="text-sm">
+        Elige un plan y activa tu <strong>prueba gratuita de 30 días</strong>.
+        Ingresa tu tarjeta hoy — no se te cobrará nada hasta que termine el mes.
+        Cancela cuando quieras.
+      </p>
+    </div>
+  )
+}
+
 function CanceledBanner() {
   const searchParams = useSearchParams()
   const canceled = searchParams.get('checkout') === 'canceled'
@@ -95,8 +114,8 @@ function CanceledBanner() {
   const msg = reason === 'payment_failed'
     ? 'Hubo un problema con tu pago. Por favor intenta de nuevo.'
     : reason === 'no_subscription'
-    ? 'Necesitas un plan activo para acceder al dashboard.'
-    : 'El proceso de pago fue cancelado. Puedes intentarlo cuando quieras.'
+    ? 'Necesitas activar tu plan para acceder al dashboard.'
+    : 'El proceso fue cancelado. Puedes intentarlo cuando quieras.'
 
   return (
     <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-center text-sm">
@@ -165,6 +184,7 @@ function PricingContent() {
         </div>
 
         <Suspense fallback={null}>
+          <WelcomeBanner />
           <CanceledBanner />
         </Suspense>
 
@@ -216,6 +236,11 @@ function PricingContent() {
                       Luego ${plan.price}/año · equivale a ${plan.pricePerMonth}/mes
                     </p>
                   )}
+                  {/* ✅ NUEVO: Badge de trial visible en cada card */}
+                  <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+                    <Gift className="w-3.5 h-3.5" />
+                    30 días gratis — no se cobra hasta que termine el trial
+                  </div>
                 </div>
 
                 {/* Features */}
@@ -235,7 +260,7 @@ function PricingContent() {
                 {/* Coupon */}
                 <CouponBadge coupon={plan.coupon} label={plan.couponLabel} />
 
-                {/* CTA */}
+                {/* ✅ CAMBIO: Texto del botón actualizado */}
                 <button
                   onClick={() => handleSubscribe(plan.id)}
                   disabled={loading !== null}
@@ -247,7 +272,7 @@ function PricingContent() {
                 >
                   {loading === plan.id
                     ? 'Redirigiendo...'
-                    : 'Comenzar ahora →'}
+                    : '🎁 Comenzar 30 días gratis →'}
                 </button>
 
                 {isPopular && (
@@ -262,7 +287,7 @@ function PricingContent() {
 
         {/* Footer note */}
         <p className="text-center text-slate-400 text-xs mt-10">
-          Al suscribirte aceptas nuestros Términos de Servicio. Cancela en cualquier momento sin penalización.
+          Al suscribirte aceptas nuestros Términos de Servicio. Tu tarjeta no será cobrada durante los primeros 30 días. Cancela en cualquier momento sin penalización.
         </p>
       </div>
     </div>

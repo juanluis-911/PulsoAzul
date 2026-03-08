@@ -4,8 +4,6 @@ import { NextResponse } from 'next/server'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-// Mapa de price IDs por plan
-// Reemplaza estos valores con los Price IDs reales de tu dashboard de Stripe
 const PRICES = {
   pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
   pro_annual:  process.env.STRIPE_PRICE_PRO_ANNUAL,
@@ -27,7 +25,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Plan inválido' }, { status: 400 })
     }
 
-    // Verificar si el usuario ya tiene un stripe_customer_id guardado
     const { data: sub } = await supabase
       .from('subscriptions')
       .select('stripe_customer_id')
@@ -36,7 +33,6 @@ export async function POST(request) {
 
     let customerId = sub?.stripe_customer_id
 
-    // Si no existe, crear customer en Stripe y guardar en Supabase
     if (!customerId) {
       const { data: perfil } = await supabase
         .from('perfiles')
@@ -52,7 +48,6 @@ export async function POST(request) {
 
       customerId = customer.id
 
-      // Guardar el customer en Supabase (upsert por si la fila no existe aún)
       await supabase.from('subscriptions').upsert({
         id: user.id,
         stripe_customer_id: customerId,
@@ -60,11 +55,14 @@ export async function POST(request) {
       })
     }
 
-    // Crear Checkout Session
+    // ✅ CAMBIO: payment_method_collection: 'always' garantiza que Stripe
+    // solicite la tarjeta incluso durante el período de prueba gratuito.
+    // El usuario NO será cobrado hasta que terminen los 30 días.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
+      payment_method_collection: 'always',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?checkout=success`,
       cancel_url:  `${process.env.NEXT_PUBLIC_URL}/pricing?checkout=canceled`,
@@ -72,7 +70,6 @@ export async function POST(request) {
         trial_period_days: 30,
         metadata: { supabase_user_id: user.id, plan },
       },
-      // Permite al usuario ver un resumen antes de pagar
       allow_promotion_codes: true,
     })
 
