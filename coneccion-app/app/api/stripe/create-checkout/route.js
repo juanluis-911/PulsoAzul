@@ -55,14 +55,15 @@ export async function POST(request) {
       })
     }
 
-    // ✅ CAMBIO: payment_method_collection: 'always' garantiza que Stripe
-    // solicite la tarjeta incluso durante el período de prueba gratuito.
-    // El usuario NO será cobrado hasta que terminen los 30 días.
+    // ✅ CAMBIO: payment_method_collection: 'if_required'
+    // Stripe NO pedirá tarjeta durante el trial de 30 días.
+    // Al vencer el trial, Stripe enviará un email al usuario pidiéndole
+    // que agregue su método de pago para continuar.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
-      payment_method_collection: 'always',
+      payment_method_collection: 'if_required',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?checkout=success`,
       cancel_url:  `${process.env.NEXT_PUBLIC_URL}/pricing?checkout=canceled`,

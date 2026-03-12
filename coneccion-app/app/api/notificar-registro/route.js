@@ -55,7 +55,7 @@ export async function POST(request) {
     const payload = JSON.stringify({
       title: `📋 Nuevo registro - ${nombreNino}`,
       body: 'Se agregó un nuevo registro diario. ¡Tócalo para verlo!',
-      url: urlRegistro || `/progreso`,
+      url: urlRegistro || `/historial`,
     })
 
     // Enviar a todos en paralelo
