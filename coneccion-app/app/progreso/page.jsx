@@ -539,12 +539,15 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
                         }`}>
                         {copiado ? <><Check className="w-3.5 h-3.5" />Copiado</> : <><Copy className="w-3.5 h-3.5" />Copiar prompt</>}
                       </button>
+                      {/*
                       <button onClick={analizarConIA} disabled={loadingIA}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all disabled:opacity-60">
                         {loadingIA
                           ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analizando...</>
                           : <><Bot className="w-4 h-4" />Analizar ahora</>}
                       </button>
+                      */}
+                      {/*
                       <button
                         onClick={generarYDescargarReporte}
                         disabled={generandoPDF || !datosFiltrados.length}
@@ -564,6 +567,7 @@ Responde en español, con lenguaje accesible para padres pero también técnico 
                           <>📄 Descargar reporte</>
                         )}
                       </button>
+                      */}
                     </div>
                   </div>
 
