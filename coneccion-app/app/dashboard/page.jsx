@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
-import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle, Trophy } from 'lucide-react'
+import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle, Trophy, Gift } from 'lucide-react'
 import { obtenerSaludo, formatearFecha, calcularEdad, ESTADOS_ANIMO } from '@/lib/utils'
 import { RegistroCard } from '@/components/RegistroCard'
 import { LogrosToast } from '@/components/LogrosToast'
@@ -232,15 +232,38 @@ export default async function DashboardPage() {
               />
             </div>
 
-            {ultimoEstado && (
-              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm 
-                              border border-white/20 rounded-full px-3 py-1.5">
-                <span className="text-base">{ultimoEstado.emoji}</span>
-                <span className="text-white text-xs font-medium">
-                  Último registro: {ultimoEstado.label}
+            <div className="flex flex-wrap items-center gap-2">
+              {ultimoEstado && (
+                <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm
+                                border border-white/20 rounded-full px-3 py-1.5">
+                  <span className="text-base">{ultimoEstado.emoji}</span>
+                  <span className="text-white text-xs font-medium">
+                    Último registro: {ultimoEstado.label}
+                  </span>
+                </div>
+              )}
+
+              {/* ── Botón Invitar papás ─────────────────────────────────── */}
+              <Link
+                href="/mi-red"
+                style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)' }}
+                className="group inline-flex items-center gap-2
+                           border border-white/30 rounded-full
+                           px-4 py-1.5 shadow-lg
+                           transition-all duration-200 active:scale-95 hover:opacity-90"
+              >
+                {/* Pulso vivo */}
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                 </span>
-              </div>
-            )}
+                <Gift className="w-3.5 h-3.5 text-white shrink-0" />
+                <span className="text-white text-xs font-bold whitespace-nowrap">
+                  ¡Invita papás · Gana bonos!
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </Link>
+            </div>
           </div>
         </div>
 

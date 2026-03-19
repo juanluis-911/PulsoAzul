@@ -61,9 +61,15 @@ export default function LoginPage() {
         console.log('Sesión establecida:', data.session.user.email)
 
         // ✅ Si es invitación, pasar ?invited=true para que complete-profile
-        // sepa que debe pedir contraseña
+        // sepa que debe pedir contraseña.
+        // Si el admin guardó invitacion_token en user_metadata, pasarlo también
+        // para que al terminar el perfil redirija a la página de aceptación.
         if (type === 'invite') {
-          router.push('/auth/complete-profile?invited=true')
+          const invToken = data.session?.user?.user_metadata?.invitacion_token
+          const qs = invToken
+            ? `?invited=true&invitacion_token=${invToken}`
+            : '?invited=true'
+          router.push('/auth/complete-profile' + qs)
           return
         }
 

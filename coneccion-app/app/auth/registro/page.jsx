@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 import NextImage from 'next/image'
 
-export default function RegistroPage() {
+function RegistroForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const refParam = searchParams.get('ref') // token de referido o userId del referidor
+
   const [formData, setFormData] = useState({
     nombreCompleto: '',
     email: '',
@@ -58,8 +61,23 @@ export default function RegistroPage() {
       return
     }
 
-    // ✅ CAMBIO: Trial sin tarjeta — va directo al dashboard
-    // El middleware permitirá el acceso con status 'free_trial'
+    // ── Registrar referido si viene con ?ref= ─────────────────────────────
+    if (refParam && data.user) {
+      try {
+        await fetch('/api/referidos', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ref: refParam,
+            userId: data.user.id,
+            nombre: formData.nombreCompleto,
+          }),
+        })
+      } catch {
+        // No bloquear el flujo si esto falla
+      }
+    }
+
     router.push('/dashboard?welcome=true')
     router.refresh()
   }
@@ -92,6 +110,17 @@ export default function RegistroPage() {
               <p className="text-xs text-green-600">No pedimos tarjeta. Empieza a usar la app hoy mismo.</p>
             </div>
           </div>
+
+          {/* Badge referido */}
+          {refParam && (
+            <div className="mb-6 flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
+              <span className="text-lg">🤝</span>
+              <div>
+                <p className="text-sm font-semibold text-violet-800">Invitado por un miembro</p>
+                <p className="text-xs text-violet-600">Fuiste invitado a unirte a Pulso Azul.</p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleRegistro} className="space-y-4">
             <Input
@@ -152,5 +181,17 @@ export default function RegistroPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function RegistroPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
+    }>
+      <RegistroForm />
+    </Suspense>
   )
 }

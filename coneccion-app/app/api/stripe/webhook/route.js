@@ -73,6 +73,28 @@ export async function POST(request) {
           current_period_end:    getPeriodEnd(subscription),
           cancel_at_period_end:  subscription.cancel_at_period_end,
         })
+
+        // ── Bonificación por referido ────────────────────────────────────
+        // Si este nuevo suscriptor llegó por invitación de alguien, otorgar bono.
+        try {
+          const { data: referido } = await supabaseAdmin
+            .from('referidos')
+            .select('id, bono_otorgado')
+            .eq('invitado_user_id', userId)
+            .in('status', ['registrado', 'pendiente'])
+            .maybeSingle()
+
+          if (referido && !referido.bono_otorgado) {
+            await supabaseAdmin
+              .from('referidos')
+              .update({ status: 'suscrito', bono_otorgado: true, suscrito_at: new Date().toISOString() })
+              .eq('id', referido.id)
+            console.log(`[webhook] Bono otorgado por referido ${referido.id} (suscriptor: ${userId})`)
+          }
+        } catch (bonErr) {
+          console.error('[webhook] Error procesando bono de referido:', bonErr)
+        }
+
         break
       }
 

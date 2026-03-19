@@ -64,6 +64,18 @@ function CompleteProfileForm() {
     setNeedsPassword(isInvited || isNewUser)
   }
 
+  // Devuelve la URL a la que redirigir después de guardar el perfil.
+  // Si existe invitacion_token (pasado por login/page.jsx desde user_metadata),
+  // va a /invitacion/[token]?new=true para aceptar automáticamente.
+  const getRedirectAfterSave = () => {
+    const invToken =
+      searchParams.get('invitacion_token') ||
+      user?.user_metadata?.invitacion_token
+
+    if (invToken) return `/invitacion/${invToken}?new=true`
+    return '/dashboard?welcome=true'
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -125,7 +137,7 @@ function CompleteProfileForm() {
       }
 
       setMessage({ type: 'success', text: 'Perfil completado exitosamente' })
-      setTimeout(() => router.push('/dashboard?welcome=true'), 1000)
+      setTimeout(() => router.push(getRedirectAfterSave()), 1000)
     } catch (error) {
       setMessage({ type: 'error', text: 'Error al guardar el perfil: ' + error.message })
     } finally {
