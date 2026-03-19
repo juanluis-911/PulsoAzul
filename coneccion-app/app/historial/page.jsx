@@ -325,28 +325,46 @@ export default function HistorialPage() {
     setRegistros(regsData)
 
     const autorIds = [...new Set(regsData.map(r => r.creado_por).filter(Boolean))]
+    const autoresMap = {}
     if (autorIds.length) {
       const { data: autoresData } = await supabase
         .from('perfiles').select('id, nombre_completo, rol_principal').in('id', autorIds)
-      const map = {}
-      autoresData?.forEach(a => { map[a.id] = a })
-      setAutores(map)
+      autoresData?.forEach(a => { autoresMap[a.id] = a })
+      setAutores(autoresMap)
     }
 
     // Cargar reacciones de todos los registros
     const regIds = regsData.map(r => r.id)
     if (regIds.length) {
-      const { data: reacData } = await supabase
+      const { data: reacData, error: reacError } = await supabase
         .from('registro_reacciones')
-        .select('id, registro_id, usuario_id, emoji, perfiles(nombre_completo)')
+        .select('id, registro_id, usuario_id, emoji')
         .in('registro_id', regIds)
 
-      const mapR = {}
-      ;(reacData || []).forEach(rx => {
-        if (!mapR[rx.registro_id]) mapR[rx.registro_id] = []
-        mapR[rx.registro_id].push({ id: rx.id, usuario_id: rx.usuario_id, emoji: rx.emoji, perfil_nombre: rx.perfiles?.nombre_completo })
-      })
-      setReacciones(mapR)
+      if (!reacError && reacData?.length) {
+        // Resolver nombres: puede haber reactores que no son autores de registros
+        const reactorIds = [...new Set(reacData.map(rx => rx.usuario_id))]
+        const faltantes = reactorIds.filter(id => !autoresMap[id])
+
+        const perfilesExtra = {}
+        if (faltantes.length) {
+          const { data: extra } = await supabase
+            .from('perfiles').select('id, nombre_completo').in('id', faltantes)
+          ;(extra || []).forEach(p => { perfilesExtra[p.id] = p.nombre_completo })
+        }
+
+        const mapR = {}
+        reacData.forEach(rx => {
+          if (!mapR[rx.registro_id]) mapR[rx.registro_id] = []
+          mapR[rx.registro_id].push({
+            id: rx.id,
+            usuario_id: rx.usuario_id,
+            emoji: rx.emoji,
+            perfil_nombre: autoresMap[rx.usuario_id]?.nombre_completo ?? perfilesExtra[rx.usuario_id] ?? null,
+          })
+        })
+        setReacciones(mapR)
+      }
     }
 
     setLoading(false)
@@ -365,12 +383,34 @@ export default function HistorialPage() {
         [registroId]: (prev[registroId] ?? []).filter(rx => rx.id !== existente.id),
       }))
     } else {
-      const { data: { user: u } } = await supabase.auth.getUser()
-      const { data: inserted } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('registro_reacciones')
         .insert({ registro_id: registroId, usuario_id: user.id, emoji })
         .select('id')
         .single()
+
+      // 23505 = duplicate key: ya existe en BD pero no estaba en el estado local
+      // → buscarla y eliminarla (comportamiento toggle)
+      if (insertError?.code === '23505') {
+        const { data: existenteDb } = await supabase
+          .from('registro_reacciones')
+          .select('id')
+          .eq('registro_id', registroId)
+          .eq('usuario_id', user.id)
+          .eq('emoji', emoji)
+          .single()
+        if (existenteDb) {
+          await supabase.from('registro_reacciones').delete().eq('id', existenteDb.id)
+          setReacciones(prev => ({
+            ...prev,
+            [registroId]: (prev[registroId] ?? []).filter(
+              rx => !(rx.usuario_id === user.id && rx.emoji === emoji)
+            ),
+          }))
+        }
+        return
+      }
+
       if (inserted) {
         const { data: perfil } = await supabase
           .from('perfiles').select('nombre_completo').eq('id', user.id).maybeSingle()
