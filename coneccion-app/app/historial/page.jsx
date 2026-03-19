@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +13,7 @@ import {
   Users, Activity, Dumbbell, CheckCircle2,
 } from 'lucide-react'
 import { formatearFecha, ESTADOS_ANIMO } from '@/lib/utils'
+import { RegistroCard } from '@/components/RegistroCard'
 
 const PAGE_SIZE = 10
 
@@ -71,63 +72,8 @@ function Skeleton() {
   )
 }
 
-// ── Tarjeta de registro ───────────────────────────────────────────────────────
-function RegistroCard({ r, autor, onClick }) {
-  const tipo   = TIPO_MAP[r.tipo_registro] ?? { label: r.tipo_registro, cls: 'bg-slate-100 text-slate-600', dot: 'bg-slate-300' }
-  const estado = r.estado_animo ? ESTADOS_ANIMO?.[r.estado_animo] : null
-
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden
-                 hover:shadow-md hover:border-slate-200 active:scale-[0.99]
-                 transition-all duration-150 cursor-pointer"
-    >
-      <div className={`h-1 w-full ${tipo.dot}`} />
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="min-w-0">
-            <p className="font-bold text-slate-900 text-sm truncate">
-              {r.ninos ? `${r.ninos.nombre} ${r.ninos.apellido}` : '—'}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">{formatearFecha(r.fecha)}</p>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
-            <Chip className={tipo.cls}>{tipo.label}</Chip>
-            {estado && <Chip className={estado.color}>{estado.emoji} {estado.label}</Chip>}
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          {r.logros && (
-            <p className="text-sm text-slate-700 leading-snug">
-              <span className="font-semibold text-emerald-700">✨ Logro:</span> {r.logros}
-            </p>
-          )}
-          {r.desafios && (
-            <p className="text-sm text-slate-700 leading-snug">
-              <span className="font-semibold text-orange-600">🎯 Desafío:</span> {r.desafios}
-            </p>
-          )}
-          {r.notas && !r.logros && !r.desafios && (
-            <p className="text-sm text-slate-500 italic line-clamp-2">{r.notas}</p>
-          )}
-        </div>
-        {autor && (
-          <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-50">
-            <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-xs
-                             font-bold flex items-center justify-center shrink-0">
-              {autor.nombre_completo?.charAt(0).toUpperCase()}
-            </span>
-            <p className="text-xs text-slate-400">
-              {autor.nombre_completo?.split(' ')[0]}
-              {autor.rol_principal && ` · ${ROL_LABEL[autor.rol_principal] ?? autor.rol_principal}`}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+// ── Tarjeta de registro se importa desde componente compartido ────────────────
+// (ver @/components/RegistroCard)
 
 // ── Helpers del drawer ────────────────────────────────────────────────────────
 function Section({ icon, titulo, children }) {
@@ -331,6 +277,7 @@ export default function HistorialPage() {
   const [ninos, setNinos]         = useState([])
   const [registros, setRegistros] = useState([])
   const [autores, setAutores]     = useState({})
+  const [reacciones, setReacciones] = useState({}) // { [registroId]: [{id, emoji, usuario_id, perfil_nombre}] }
   const [loading, setLoading]     = useState(true)
   const [showFilters, setShowFilters]         = useState(false)
   const [selectedRegistro, setSelectedRegistro] = useState(null)
@@ -385,8 +332,64 @@ export default function HistorialPage() {
       autoresData?.forEach(a => { map[a.id] = a })
       setAutores(map)
     }
+
+    // Cargar reacciones de todos los registros
+    const regIds = regsData.map(r => r.id)
+    if (regIds.length) {
+      const { data: reacData } = await supabase
+        .from('registro_reacciones')
+        .select('id, registro_id, usuario_id, emoji, perfiles(nombre_completo)')
+        .in('registro_id', regIds)
+
+      const mapR = {}
+      ;(reacData || []).forEach(rx => {
+        if (!mapR[rx.registro_id]) mapR[rx.registro_id] = []
+        mapR[rx.registro_id].push({ id: rx.id, usuario_id: rx.usuario_id, emoji: rx.emoji, perfil_nombre: rx.perfiles?.nombre_completo })
+      })
+      setReacciones(mapR)
+    }
+
     setLoading(false)
   }
+
+  const toggleReaccion = useCallback(async (registroId, emoji) => {
+    if (!user) return
+    const supabase = createClient()
+    const lista = reacciones[registroId] ?? []
+    const existente = lista.find(rx => rx.usuario_id === user.id && rx.emoji === emoji)
+
+    if (existente) {
+      await supabase.from('registro_reacciones').delete().eq('id', existente.id)
+      setReacciones(prev => ({
+        ...prev,
+        [registroId]: (prev[registroId] ?? []).filter(rx => rx.id !== existente.id),
+      }))
+    } else {
+      const { data: { user: u } } = await supabase.auth.getUser()
+      const { data: inserted } = await supabase
+        .from('registro_reacciones')
+        .insert({ registro_id: registroId, usuario_id: user.id, emoji })
+        .select('id')
+        .single()
+      if (inserted) {
+        const { data: perfil } = await supabase
+          .from('perfiles').select('nombre_completo').eq('id', user.id).maybeSingle()
+        setReacciones(prev => ({
+          ...prev,
+          [registroId]: [...(prev[registroId] ?? []), {
+            id: inserted.id, usuario_id: user.id, emoji,
+            perfil_nombre: perfil?.nombre_completo,
+          }],
+        }))
+        // Notificar al equipo en segundo plano
+        fetch('/api/notificar-reaccion-registro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registroId, emoji }),
+        }).catch(() => {})
+      }
+    }
+  }, [user, reacciones])
 
   const filtrados = useMemo(() => registros.filter(r => {
     if (ninoId !== 'todos' && r.nino_id !== ninoId) return false
@@ -570,6 +573,9 @@ export default function HistorialPage() {
                   r={r}
                   autor={autores[r.creado_por]}
                   onClick={() => setSelectedRegistro(r)}
+                  reacciones={reacciones[r.id] ?? []}
+                  userId={user?.id}
+                  onToggleReaccion={toggleReaccion}
                 />
               ))}
             </div>

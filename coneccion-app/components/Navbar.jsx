@@ -7,7 +7,7 @@ import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap, Trophy
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -23,6 +23,7 @@ export function Navbar({ user }) {
   const [metasActivas, setMetasActivas]   = useState(0)
   const [perfil, setPerfil]               = useState(null)
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
+  const [logrosInfo, setLogrosInfo]       = useState({ count: 0, nivel: null })
 
   const { estado, activar, desactivar }   = useNotificaciones()
   const { subscription, isActive, openPortal } = useSubscription()
@@ -98,6 +99,29 @@ export function Navbar({ user }) {
     fetchNoLeidos()
   }, [user, pathname])
 
+  // ── Cargar logros del usuario ─────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    const fetchLogros = async () => {
+      const sb = createClient()
+      const { data } = await sb
+        .from('logros_usuario')
+        .select('logro_id')
+        .eq('usuario_id', user.id)
+      const count = (data || []).length
+      // Determinar nivel más alto alcanzado
+      const ORDEN = ['bronce', 'plata', 'oro', 'platino', 'diamante']
+      const NIVEL_LABEL = { bronce: 'Bronce', plata: 'Plata', oro: 'Oro', platino: 'Platino', diamante: 'Diamante' }
+      // Importar definiciones para mapear logro_id → nivel
+      const { LOGROS_MAP } = await import('@/lib/logros-definicion')
+      const niveles = (data || []).map(l => LOGROS_MAP[l.logro_id]?.nivel).filter(Boolean)
+      let nivelMax = null
+      ORDEN.forEach(n => { if (niveles.includes(n)) nivelMax = n })
+      setLogrosInfo({ count, nivel: nivelMax ? NIVEL_LABEL[nivelMax] : null })
+    }
+    fetchLogros()
+  }, [user, pathname])
+
   const handleInstall = async () => {
     if (!installPrompt) return
     await installPrompt.prompt()
@@ -113,6 +137,12 @@ export function Navbar({ user }) {
     router.refresh()
   }
 
+  const logrosBadgeLabel = logrosInfo.count > 0
+    ? logrosInfo.nivel
+      ? `${logrosInfo.nivel} (${logrosInfo.count})`
+      : `${logrosInfo.count}`
+    : null
+
   const navItems = [
     { href: '/dashboard',       label: 'Inicio',               icon: Home },
     { href: '/historial',       label: 'Registros Diarios',    icon: BookOpen },
@@ -122,6 +152,7 @@ export function Navbar({ user }) {
     { href: '/equipo',          label: 'Red de apoyo',         icon: Users },
     { href: '/reporte-medico',  label: 'Reporte para Médicos', icon: FileText },
     { href: '/invitar',         label: 'Invitar',              icon: UserPlus },
+    { href: '/logros',          label: 'Mis Logros',           icon: Trophy, badgeLogros: logrosBadgeLabel },
     { href: '/ayuda',           label: 'Ayuda',                icon: HelpCircle },
   ]
 
@@ -246,7 +277,7 @@ export function Navbar({ user }) {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon, badge }) => {
+        {navItems.map(({ href, label, icon: Icon, badge, badgeLogros }) => {
           const active    = pathname === href || pathname.startsWith(href + '/')
           const showBadge = badge > 0
           return (
@@ -270,6 +301,13 @@ export function Navbar({ user }) {
                     {badge > 99 ? '99+' : badge}
                   </span>
                 )}
+                {badgeLogros && collapsed && !mobile && (
+                  <span className="absolute -top-1.5 -right-2 h-4 px-1
+                                   bg-violet-500 text-white text-[8px] font-bold rounded-full
+                                   flex items-center justify-center leading-none whitespace-nowrap">
+                    🏆
+                  </span>
+                )}
               </div>
               {(!collapsed || mobile) && (
                 <>
@@ -279,6 +317,13 @@ export function Navbar({ user }) {
                                      flex items-center justify-center leading-none shrink-0
                                      ${active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'}`}>
                       {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                  {badgeLogros && (
+                    <span className={`h-5 px-2 rounded-full text-[10px] font-bold
+                                     flex items-center justify-center leading-none shrink-0 whitespace-nowrap
+                                     ${active ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'}`}>
+                      {badgeLogros}
                     </span>
                   )}
                 </>

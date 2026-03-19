@@ -3,9 +3,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
-import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle } from 'lucide-react'
+import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle, Trophy } from 'lucide-react'
 import { obtenerSaludo, formatearFecha, calcularEdad, ESTADOS_ANIMO } from '@/lib/utils'
 import { RegistroCard } from '@/components/RegistroCard'
+import { LogrosToast } from '@/components/LogrosToast'
 
 
 // ─── Componente: avatar con iniciales ────────────────────────────────────────
@@ -204,6 +205,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Navbar user={user} />
+      <LogrosToast />
 
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
         {/* ── Hero / encabezado ───────────────────────────────────────────── */}
@@ -262,6 +264,14 @@ export default async function DashboardPage() {
               sublabel="Documenta el día"
               iconBg="bg-blue-50"
               iconColor="text-blue-600"
+            />
+            <AccionCard
+              href="/logros"
+              icon={Trophy}
+              label="Mis logros"
+              sublabel="Recompensas"
+              iconBg="bg-violet-50"
+              iconColor="text-violet-600"
             />
             {rol === 'padre' && (
               <>

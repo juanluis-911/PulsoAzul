@@ -21,11 +21,41 @@ const NIVEL_APOYO_LABEL = [
   'Apoyo físico parcial', 'Apoyo físico total',
 ]
 
+const EMOJIS_REACCION = ['👍', '❤️', '😮', '🎉', '💪', '👏']
+
 function Chip({ children, className = '' }) {
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${className}`}>
       {children}
     </span>
+  )
+}
+
+function agruparReacciones(reacciones) {
+  const map = {}
+  ;(reacciones || []).forEach(r => {
+    if (!map[r.emoji]) map[r.emoji] = []
+    map[r.emoji].push(r)
+  })
+  return map
+}
+
+function EmojiPicker({ onSelect, onClose }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-20" onClick={onClose} />
+      <div className="absolute bottom-full mb-1 z-30 bg-white border border-slate-200 rounded-2xl shadow-xl px-2 py-1.5 flex gap-0.5">
+        {EMOJIS_REACCION.map(e => (
+          <button
+            key={e}
+            onClick={() => { onSelect(e); onClose() }}
+            className="w-9 h-9 text-xl rounded-xl hover:bg-slate-100 active:scale-110 transition-all flex items-center justify-center"
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -39,9 +69,13 @@ function Chip({ children, className = '' }) {
  * 2. Historial (autor cargado por separado):
  *    <RegistroCard r={r} autor={autores[r.creado_por]} onClick={() => ...} />
  *    → con onClick: abre drawer, sin acordeón
+ *
+ * Reacciones (opcionales):
+ *    <RegistroCard ... reacciones={[]} userId="..." onToggleReaccion={fn} />
  */
-export function RegistroCard({ registro, r, autor: autorProp, onClick }) {
+export function RegistroCard({ registro, r, autor: autorProp, onClick, reacciones, userId, onToggleReaccion }) {
   const [open, setOpen] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
 
   const data   = registro ?? r
   const autor  = autorProp ?? registro?.perfiles
@@ -71,6 +105,11 @@ export function RegistroCard({ registro, r, autor: autorProp, onClick }) {
     m.nivel_apoyo_general != null ||
     m.actividades?.length > 0
   )
+
+  // Reacciones agrupadas
+  const mostrarReacciones = reacciones !== undefined && onToggleReaccion
+  const reaccionesAgrupadas = agruparReacciones(reacciones)
+  const tieneReacciones = mostrarReacciones && Object.keys(reaccionesAgrupadas).length > 0
 
   return (
     <div
@@ -176,6 +215,57 @@ export function RegistroCard({ registro, r, autor: autorProp, onClick }) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Reacciones */}
+        {mostrarReacciones && (
+          <div
+            className="mt-3 pt-2.5 border-t border-slate-50"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Reacciones existentes */}
+              {Object.entries(reaccionesAgrupadas).map(([emoji, lista]) => {
+                const yoReaccione = lista.some(rx => rx.usuario_id === userId)
+                const nombres = lista
+                  .map(rx => rx.perfil_nombre?.split(' ')[0] ?? '?')
+                  .join(', ')
+                return (
+                  <button
+                    key={emoji}
+                    onClick={() => onToggleReaccion(data.id, emoji)}
+                    title={nombres}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all hover:scale-105
+                      ${yoReaccione
+                        ? 'bg-primary-50 border-primary-200 text-primary-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                  >
+                    <span>{emoji}</span>
+                    <span>{lista.length}</span>
+                  </button>
+                )
+              })}
+
+              {/* Botón para agregar reacción */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowPicker(v => !v)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-sm
+                             bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all"
+                  title="Reaccionar"
+                >
+                  {tieneReacciones ? '＋' : '😊'}
+                </button>
+                {showPicker && (
+                  <EmojiPicker
+                    onSelect={e => onToggleReaccion(data.id, e)}
+                    onClose={() => setShowPicker(false)}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         )}
 

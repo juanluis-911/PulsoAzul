@@ -306,6 +306,17 @@ export default function RegistroDiarioPage() {
       }).catch(() => {})
     }
 
+    // Evaluar logros en segundo plano
+    fetch('/api/evaluar-logros', { method: 'POST' })
+      .then(res => res.json())
+      .then(({ logrosNuevos }) => {
+        if (logrosNuevos?.length) {
+          // Guardamos en sessionStorage para mostrar notificación en dashboard
+          sessionStorage.setItem('logros_nuevos', JSON.stringify(logrosNuevos))
+        }
+      })
+      .catch(() => {})
+
     router.push('/dashboard')
     router.refresh()
   }

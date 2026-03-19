@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/PulsoAzul/PulsoAzul/coneccion-app -type f \\\\\\(-name *registro* -o -name *reaction* -o -name *role* -o -name *user* \\\\\\) -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/PulsoAzul/PulsoAzul/coneccion-app -type f -name *.sql -o -name *metas* -o -name *logros*)"
+    ]
+  }
+}
