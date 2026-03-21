@@ -7,7 +7,7 @@ import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap, Trophy, Network, Newspaper
+  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap, Trophy, Network, Newspaper, LayoutGrid
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -154,6 +154,7 @@ export function Navbar({ user }) {
     { href: '/invitar',         label: 'Invitar',              icon: UserPlus },
     { href: '/mi-red',          label: 'Mi Red',               icon: Network },
     { href: '/logros',          label: 'Mis Logros',           icon: Trophy, badgeLogros: logrosBadgeLabel },
+    { href: '/material',         label: 'Material',             icon: LayoutGrid },
     { href: '/noticias',        label: 'Noticias',             icon: Newspaper },
     { href: '/ayuda',           label: 'Ayuda',                icon: HelpCircle },
   ]

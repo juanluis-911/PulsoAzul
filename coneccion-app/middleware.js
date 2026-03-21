@@ -92,6 +92,67 @@ export async function middleware(request) {
     }
   }
 
+  // ── Rutas de /pecs → requieren auth + acceso válido ──────────────────────
+  if (pathname.startsWith('/material')) {
+
+    // 1. Sin sesión → login
+    if (!user) {
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // 2. Maestros y terapeutas → acceso gratuito siempre
+    const { data: equipoRow } = await supabase
+      .from('equipo_terapeutico')
+      .select('rol')
+      .eq('usuario_id', user.id)
+      .in('rol', ['maestra_sombra', 'terapeuta'])
+      .limit(1)
+      .maybeSingle()
+
+    if (equipoRow) return response
+
+    // 3. Para padres → verificar acceso
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('status, current_period_end, cancel_at_period_end')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!sub) {
+      const createdAt = new Date(user.created_at)
+      const now = new Date()
+      const diasTranscurridos = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
+      const TRIAL_DIAS = 30
+
+      if (diasTranscurridos <= TRIAL_DIAS) {
+        const diasRestantes = TRIAL_DIAS - diasTranscurridos
+        response.headers.set('x-trial-dias-restantes', String(diasRestantes))
+        return response
+      } else {
+        const pricingUrl = new URL('/pricing', request.url)
+        pricingUrl.searchParams.set('reason', 'trial_expired')
+        return NextResponse.redirect(pricingUrl)
+      }
+    }
+
+    const hasAccess = sub.status === 'active' || sub.status === 'trialing'
+    const periodEnded = sub.current_period_end
+      ? new Date(sub.current_period_end) < new Date()
+      : true
+    const stillActive = sub.cancel_at_period_end && !periodEnded
+
+    if (!hasAccess && !stillActive) {
+      const pricingUrl = new URL('/pricing', request.url)
+      pricingUrl.searchParams.set(
+        'reason',
+        sub.status === 'past_due' ? 'payment_failed' : 'no_subscription'
+      )
+      return NextResponse.redirect(pricingUrl)
+    }
+  }
+
   // ── Rutas de auth → redirigir al dashboard si ya está autenticado ─────────
   if (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/register')) {
     const hasInviteParam = request.nextUrl.searchParams.has('invited')
