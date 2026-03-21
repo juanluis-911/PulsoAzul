@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
-import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle, Trophy, Gift } from 'lucide-react'
+import { Plus, Users, FileText, ChevronRight, Sparkles, Heart, BookOpen, MessageCircle, Trophy, Gift, Newspaper } from 'lucide-react'
 import { obtenerSaludo, formatearFecha, calcularEdad, ESTADOS_ANIMO } from '@/lib/utils'
 import { RegistroCard } from '@/components/RegistroCard'
 import { LogrosToast } from '@/components/LogrosToast'
@@ -197,6 +197,13 @@ export default async function DashboardPage() {
     user.user_metadata?.nombre_completo ||
     etiquetaRol
 
+  const { data: ultimaNoticia } = await supabase
+    .from('noticias')
+    .select('id, titulo, resumen, imagen_url, fecha_publicacion')
+    .order('fecha_publicacion', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   const ultimoRegistro = registrosConAutor?.[0]
   const ultimoEstado = ultimoRegistro?.estado_animo
     ? ESTADOS_ANIMO[ultimoRegistro.estado_animo]
@@ -317,6 +324,43 @@ export default async function DashboardPage() {
               </>
             )}
           </div>
+
+          {/* ── Última noticia ────────────────────────────────────────────── */}
+          {ultimaNoticia && (
+            <div className="mb-6">
+              <Seccion
+                titulo="📰 Noticias de hoy"
+                descripcion="Artículos sobre salud infantil y terapia"
+                href="/noticias"
+                hrefLabel="Ver todas"
+              >
+                <Link href={`/noticias/${ultimaNoticia.id}`} className="flex gap-3 group">
+                  {ultimaNoticia.imagen_url && (
+                    <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
+                      <img
+                        src={ultimaNoticia.imagen_url}
+                        alt={ultimaNoticia.titulo}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-primary-600 transition-colors">
+                      {ultimaNoticia.titulo}
+                    </h3>
+                    {ultimaNoticia.resumen && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-snug">
+                        {ultimaNoticia.resumen}
+                      </p>
+                    )}
+                    <span className="inline-flex items-center gap-1 text-xs text-primary-600 font-medium mt-2 group-hover:gap-1.5 transition-all">
+                      Leer más <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </Link>
+              </Seccion>
+            </div>
+          )}
 
           {/* ── Grid principal ────────────────────────────────────────────── */}
           <div className="grid gap-4 md:grid-cols-2">

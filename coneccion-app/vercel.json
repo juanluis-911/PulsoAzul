@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/noticias-diarias",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
