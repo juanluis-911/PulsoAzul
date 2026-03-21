@@ -48,8 +48,10 @@ export async function GET(request) {
     )
     const newsUrl = `https://newsapi.org/v2/everything?q=${keywords}&domains=${DOMINIOS_ES}&language=es&sortBy=publishedAt&pageSize=20&apiKey=${process.env.NEWS_API_KEY}`
 
-    // Respaldo: top headlines de México (country=mx) si no hay resultados en dominios MX
-    const newsUrlFallback = `https://newsapi.org/v2/top-headlines?q=${keywords}&country=mx&pageSize=20&apiKey=${process.env.NEWS_API_KEY}`
+    // Respaldo 1: top headlines de México (country=mx)
+    const newsUrlFallback1 = `https://newsapi.org/v2/top-headlines?q=${keywords}&country=mx&pageSize=20&apiKey=${process.env.NEWS_API_KEY}`
+    // Respaldo 2: búsqueda global en español sin restricción de dominio
+    const newsUrlFallback2 = `https://newsapi.org/v2/everything?q=${keywords}&language=es&sortBy=publishedAt&pageSize=20&apiKey=${process.env.NEWS_API_KEY}`
 
     let newsRes = await fetch(newsUrl, { cache: 'no-store' })
     if (!newsRes.ok) throw new Error(`NewsAPI error: ${newsRes.status}`)
@@ -59,10 +61,19 @@ export async function GET(request) {
 
     // Si no hay resultados en medios MX, buscar con country=mx como respaldo
     if (!newsData.articles?.length) {
-      newsRes = await fetch(newsUrlFallback, { cache: 'no-store' })
+      newsRes = await fetch(newsUrlFallback1, { cache: 'no-store' })
       if (newsRes.ok) {
         newsData = await newsRes.json()
         console.log(`[country=mx fallback] totalResults: ${newsData.totalResults}, artículos: ${newsData.articles?.length}`)
+      }
+    }
+
+    // Si aún no hay resultados, buscar en español sin restricción de dominio
+    if (!newsData.articles?.length) {
+      newsRes = await fetch(newsUrlFallback2, { cache: 'no-store' })
+      if (newsRes.ok) {
+        newsData = await newsRes.json()
+        console.log(`[global es fallback] totalResults: ${newsData.totalResults}, artículos: ${newsData.articles?.length}`)
       }
     }
 
@@ -80,8 +91,10 @@ export async function GET(request) {
       return !PALABRAS_EXCLUIDAS.some((p) => texto.includes(p))
     })
 
-    console.log(`[filtro] artículos que pasaron: ${articulos.length}`)
-    console.log('[títulos disponibles]', (newsData.articles || []).map(a => a.title))
+    const sinImagen = (newsData.articles || []).filter(a => !a.urlToImage).length
+    const yaGuardadasCount = (newsData.articles || []).filter(a => urlsYaGuardadas.has(a.url)).length
+    console.log(`[filtro] artículos que pasaron: ${articulos.length} | sin imagen: ${sinImagen} | ya guardadas: ${yaGuardadasCount}`)
+    console.log('[títulos disponibles]', (newsData.articles || []).map(a => ({ title: a.title, hasImage: !!a.urlToImage })))
 
     if (!articulos.length) {
       return Response.json({ error: 'No se encontraron artículos con imagen' }, { status: 404 })

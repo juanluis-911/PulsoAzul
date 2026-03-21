@@ -3,7 +3,11 @@
     "allow": [
       "Bash(find /c/PulsoAzul/PulsoAzul/coneccion-app -type f \\\\\\(-name *registro* -o -name *reaction* -o -name *role* -o -name *user* \\\\\\) -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx)",
       "Bash(xargs grep:*)",
-      "Bash(find /c/PulsoAzul/PulsoAzul/coneccion-app -type f -name *.sql -o -name *metas* -o -name *logros*)"
+      "Bash(find /c/PulsoAzul/PulsoAzul/coneccion-app -type f -name *.sql -o -name *metas* -o -name *logros*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(curl -X GET https://pulsoazul.com/api/cron/noticias-diarias -H \"Authorization: Bearer 974d004a812da5cdb6143db56697113ad0f9ccba2ea0a09234af8e87a15e035c\")"
     ]
   }
 }
