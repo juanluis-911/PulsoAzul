@@ -7,7 +7,7 @@ import NextImage from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import {
   Home, FileText, TrendingUp, UserPlus, LogOut,
-  Users, Download, Bell, ChevronLeft, ChevronRight, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap, Trophy, Network, Newspaper, LayoutGrid
+  Users, Download, Bell, ChevronLeft, ChevronRight, ChevronDown, Menu, X, BookOpen, HelpCircle, Target, MessageCircle, Clock, Zap, Trophy, Network, Newspaper, LayoutGrid
 } from 'lucide-react'
 import { useNotificaciones } from '@/hooks/useNotificaciones'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -18,6 +18,8 @@ export function Navbar({ user }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed]         = useState(false)
   const [mobileOpen, setMobileOpen]       = useState(false)
+  const [openGroups, setOpenGroups]       = useState({ seguimiento: false, comunidad: false })
+  const [showUserMenu, setShowUserMenu]   = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstall, setShowInstall]     = useState(false)
   const [metasActivas, setMetasActivas]   = useState(0)
@@ -35,7 +37,17 @@ export function Navbar({ user }) {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => { setMobileOpen(false); setShowUserMenu(false) }, [pathname])
+
+  // Auto-expandir grupo si la ruta actual pertenece a él
+  useEffect(() => {
+    const enSeguimiento = ['/historial', '/metas', '/progreso', '/reporte-medico'].some(r => pathname.startsWith(r))
+    const enComunidad   = ['/mensajes', '/equipo', '/invitar', '/mi-red'].some(r => pathname.startsWith(r))
+    setOpenGroups(prev => ({
+      seguimiento: prev.seguimiento || enSeguimiento,
+      comunidad:   prev.comunidad   || enComunidad,
+    }))
+  }, [pathname])
 
   // ── Cargar perfil del usuario ─────────────────────────────────────────
   useEffect(() => {
@@ -144,19 +156,31 @@ export function Navbar({ user }) {
     : null
 
   const navItems = [
-    { href: '/dashboard',       label: 'Inicio',               icon: Home },
-    { href: '/historial',       label: 'Registros Diarios',    icon: BookOpen },
-    { href: '/mensajes',        label: 'Mensajes',             icon: MessageCircle, badge: mensajesNoLeidos },
-    { href: '/metas',           label: 'Metas',                icon: Target, badge: metasActivas },
-    { href: '/progreso',        label: 'Progreso',             icon: TrendingUp },
-    { href: '/equipo',          label: 'Red de apoyo',         icon: Users },
-    { href: '/reporte-medico',  label: 'Reporte para Médicos', icon: FileText },
-    { href: '/invitar',         label: 'Invitar',              icon: UserPlus },
-    { href: '/mi-red',          label: 'Mi Red',               icon: Network },
-    { href: '/logros',          label: 'Mis Logros',           icon: Trophy, badgeLogros: logrosBadgeLabel },
-    { href: '/material',         label: 'Material',             icon: LayoutGrid },
-    { href: '/noticias',        label: 'Noticias',             icon: Newspaper },
-    { href: '/ayuda',           label: 'Ayuda',                icon: HelpCircle },
+    { href: '/dashboard', label: 'Inicio', icon: Home },
+    {
+      key: 'seguimiento', label: 'Seguimiento', icon: TrendingUp,
+      badge: metasActivas,  // muestra badge si hay metas activas
+      children: [
+        { href: '/historial',      label: 'Registros Diarios',    icon: BookOpen },
+        { href: '/metas',          label: 'Metas',                icon: Target, badge: metasActivas },
+        { href: '/progreso',       label: 'Progreso',             icon: TrendingUp },
+        { href: '/reporte-medico', label: 'Reporte para Médicos', icon: FileText },
+      ],
+    },
+    {
+      key: 'comunidad', label: 'Comunidad', icon: Users,
+      badge: mensajesNoLeidos,  // muestra badge si hay mensajes no leídos
+      children: [
+        { href: '/mensajes', label: 'Mensajes',     icon: MessageCircle, badge: mensajesNoLeidos },
+        { href: '/equipo',   label: 'Red de apoyo', icon: Users },
+        { href: '/invitar',  label: 'Invitar',       icon: UserPlus },
+        { href: '/mi-red',   label: 'Mi Red',        icon: Network },
+      ],
+    },
+    { href: '/material', label: 'Material',   icon: LayoutGrid },
+    { href: '/logros',   label: 'Mis Logros', icon: Trophy, badgeLogros: logrosBadgeLabel },
+    { href: '/noticias', label: 'Noticias',   icon: Newspaper },
+    { href: '/ayuda',    label: 'Ayuda',      icon: HelpCircle },
   ]
 
   const displayName  = perfil?.nombre_completo || user?.user_metadata?.nombre_completo || user?.email || ''
@@ -280,7 +304,98 @@ export function Navbar({ user }) {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon, badge, badgeLogros }) => {
+        {navItems.map((item) => {
+          // ── Grupo con hijos (acordeón) ─────────────────────────────────
+          if (item.children) {
+            const { key, label, icon: Icon, badge, children } = item
+            const isOpen      = openGroups[key]
+            const groupActive = children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'))
+            const showBadge   = badge > 0
+
+            const toggleGroup = () => {
+              if (collapsed && !mobile) {
+                // Si el sidebar está colapsado, primero lo expandimos
+                setCollapsed(false)
+                setOpenGroups(prev => ({ ...prev, [key]: true }))
+              } else {
+                setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }))
+              }
+            }
+
+            return (
+              <div key={key}>
+                {/* Cabecera del grupo */}
+                <button
+                  onClick={toggleGroup}
+                  title={collapsed && !mobile ? label : undefined}
+                  className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+                    ${groupActive
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }
+                    ${collapsed && !mobile ? 'justify-center' : ''}`}
+                >
+                  <div className="relative shrink-0">
+                    <Icon className="w-5 h-5" />
+                    {showBadge && collapsed && !mobile && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5
+                                       bg-red-500 text-white text-[9px] font-bold rounded-full
+                                       flex items-center justify-center leading-none">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
+                  </div>
+                  {(!collapsed || mobile) && (
+                    <>
+                      <span className="truncate flex-1 text-left">{label}</span>
+                      {showBadge && (
+                        <span className="min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold
+                                         bg-red-500 text-white flex items-center justify-center leading-none shrink-0">
+                          {badge > 99 ? '99+' : badge}
+                        </span>
+                      )}
+                      <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 text-slate-400
+                        ${isOpen ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+
+                {/* Sub-items */}
+                {(!collapsed || mobile) && isOpen && (
+                  <div className="mt-1 ml-3 pl-3 border-l-2 border-slate-100 space-y-0.5">
+                    {children.map(({ href, label: childLabel, icon: ChildIcon, badge: childBadge }) => {
+                      const active        = pathname === href || pathname.startsWith(href + '/')
+                      const showChildBadge = childBadge > 0
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all
+                            ${active
+                              ? 'bg-primary-600 text-white shadow-sm shadow-primary-200'
+                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                        >
+                          <ChildIcon className="w-4 h-4 shrink-0" />
+                          <span className="truncate flex-1">{childLabel}</span>
+                          {showChildBadge && (
+                            <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold
+                                             flex items-center justify-center leading-none shrink-0
+                                             ${active ? 'bg-white/25 text-white' : 'bg-red-500 text-white'}`}>
+                              {childBadge > 99 ? '99+' : childBadge}
+                            </span>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // ── Item simple ────────────────────────────────────────────────
+          const { href, label, icon: Icon, badge, badgeLogros } = item
           const active    = pathname === href || pathname.startsWith(href + '/')
           const showBadge = badge > 0
           return (
@@ -452,47 +567,92 @@ export function Navbar({ user }) {
           <span className="font-bold text-slate-900">Pulso Azul</span>
         </Link>
 
-        {/* ✅ NUEVO: Badge de trial en mobile top bar */}
-        {enTrial && perfil?.rol_principal === 'padre' && !trialVencido && (
-          <Link
-            href="/pricing"
-            className={`ml-auto flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full transition-all
-              ${trialUrgente
-                ? 'bg-orange-100 text-orange-700 border border-orange-300'
-                : 'bg-blue-100 text-blue-700 border border-blue-200'}`}
-          >
-            <Clock className="w-3 h-3" />
-            {diasRestantes}d gratis
-          </Link>
-        )}
-        {enTrial && trialVencido && perfil?.rol_principal === 'padre' && (
-          <Link
-            href="/pricing"
-            className="ml-auto flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full"
-          >
-            <Zap className="w-3 h-3" />
-            Suscríbete
-          </Link>
-        )}
+        {/* Badges de trial / mensajes / metas */}
+        <div className="ml-auto flex items-center gap-2">
+          {enTrial && perfil?.rol_principal === 'padre' && !trialVencido && (
+            <Link href="/pricing"
+              className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full transition-all
+                ${trialUrgente
+                  ? 'bg-orange-100 text-orange-700 border border-orange-300'
+                  : 'bg-blue-100 text-blue-700 border border-blue-200'}`}
+            >
+              <Clock className="w-3 h-3" />
+              {diasRestantes}d gratis
+            </Link>
+          )}
+          {enTrial && trialVencido && perfil?.rol_principal === 'padre' && (
+            <Link href="/pricing"
+              className="flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full"
+            >
+              <Zap className="w-3 h-3" />
+              Suscríbete
+            </Link>
+          )}
+          {mensajesNoLeidos > 0 && !enTrial && (
+            <Link href="/mensajes" className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors group">
+              <MessageCircle className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full
+                              bg-red-500 text-white text-[10px] font-bold flex items-center
+                              justify-center leading-none ring-2 ring-white">
+                {mensajesNoLeidos > 9 ? '9+' : mensajesNoLeidos}
+                <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75" />
+              </span>
+            </Link>
+          )}
+          {metasActivas > 0 && !enTrial && (
+            <Link href="/metas" className="flex items-center gap-1.5 bg-red-500 text-white
+                                           text-xs font-bold px-2.5 py-1 rounded-full">
+              <Target className="w-3 h-3" />
+              {metasActivas > 99 ? '99+' : metasActivas}
+            </Link>
+          )}
 
-        {mensajesNoLeidos > 0 && !enTrial && (
-          <Link href="/mensajes" className="ml-auto relative p-2 rounded-xl hover:bg-slate-100 transition-colors group">
-            <MessageCircle className="w-5 h-5 text-slate-500 group-hover:text-slate-700 transition-colors" />
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full
-                            bg-red-500 text-white text-[10px] font-bold flex items-center
-                            justify-center leading-none ring-2 ring-white">
-              {mensajesNoLeidos > 9 ? '9+' : mensajesNoLeidos}
-              <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75" />
-            </span>
-          </Link>
-        )}
-        {metasActivas > 0 && !enTrial && (
-          <Link href="/metas" className="ml-auto flex items-center gap-1.5 bg-red-500 text-white
-                                         text-xs font-bold px-2.5 py-1 rounded-full">
-            <Target className="w-3 h-3" />
-            {metasActivas > 99 ? '99+' : metasActivas} meta{metasActivas !== 1 ? 's' : ''}
-          </Link>
-        )}
+          {/* Avatar con menú de usuario */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(v => !v)}
+              className="w-8 h-8 rounded-full bg-primary-600 text-white text-sm font-bold
+                         flex items-center justify-center ring-2 ring-primary-100 hover:ring-primary-300 transition-all"
+            >
+              {initials || '?'}
+            </button>
+
+            {showUserMenu && (
+              <>
+                {/* Overlay para cerrar */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+
+                {/* Dropdown */}
+                <div className="absolute right-0 top-10 z-50 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                  {/* Info usuario */}
+                  <div className="px-3 py-2.5 mb-1">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{displayName || '—'}</p>
+                    <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
+                    <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-1 leading-none
+                      ${ perfil?.rol_principal === 'padre'          ? 'bg-amber-100 text-amber-700'
+                       : perfil?.rol_principal === 'maestra_sombra' ? 'bg-blue-100 text-blue-700'
+                       : perfil?.rol_principal === 'terapeuta'      ? 'bg-violet-100 text-violet-700'
+                       : 'bg-slate-100 text-slate-500' }`}>
+                      {rolLabel}
+                    </span>
+                  </div>
+
+                  <div className="h-px bg-slate-100 mx-1 mb-1" />
+
+                  {/* Cerrar sesión */}
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium
+                               text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 shrink-0" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Mobile overlay */}

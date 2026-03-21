@@ -1,13 +1,14 @@
+import { forwardRef } from 'react'
 import { cn } from '@/lib/utils'
 
-export function Input({ 
-  label, 
-  error, 
+export const Input = forwardRef(function Input({
+  label,
+  error,
   helperText,
   className,
   required,
-  ...props 
-}) {
+  ...props
+}, ref) {
   return (
     <div className="w-full">
       {label && (
@@ -17,6 +18,7 @@ export function Input({
         </label>
       )}
       <input
+        ref={ref}
         className={cn(
           'w-full px-3 py-2 border border-slate-300 rounded-lg',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
@@ -35,7 +37,7 @@ export function Input({
       )}
     </div>
   )
-}
+})
 
 export function Textarea({ 
   label, 

@@ -44,12 +44,16 @@ export default function PecsPage() {
   const [printSettings, setPrintSettings] = useState(DEFAULT_PRINT_SETTINGS)
   const [generating, setGenerating]       = useState(false)
   const [savedSets, setSavedSets]         = useState([])
+  const [setsError, setSetsError]         = useState(null)
   const [savingName, setSavingName]       = useState('')
   const [savingNinoId, setSavingNinoId]   = useState('')
+  const [savingMetaId, setSavingMetaId]   = useState('')
+  const [savingMetas, setSavingMetas]     = useState([])
   const [showSaveForm, setShowSaveForm]   = useState(false)
   const [saving, setSaving]               = useState(false)
   const [loadingCategory, setLoadingCategory] = useState(null)
-  const debounceRef = useRef(null)
+  const debounceRef  = useRef(null)
+  const saveInputRef = useRef(null)
 
   // ── Cargar usuario y sus niños ───────────────────────────────────────────
   useEffect(() => {
@@ -73,13 +77,35 @@ export default function PecsPage() {
 
   // ── Cargar sets guardados ────────────────────────────────────────────────
   const fetchSavedSets = useCallback(async () => {
-    const res = await fetch('/api/pecs/sets')
-    if (res.ok) setSavedSets(await res.json())
+    setSetsError(null)
+    try {
+      const res = await fetch('/api/pecs/sets')
+      if (res.ok) {
+        setSavedSets(await res.json())
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setSetsError(body.error || `Error ${res.status}`)
+      }
+    } catch (e) {
+      setSetsError('No se pudieron cargar los sets')
+    }
   }, [])
 
   useEffect(() => {
     if (activeTab === 'guardados') fetchSavedSets()
   }, [activeTab, fetchSavedSets])
+
+  // ── Cargar metas activas del niño seleccionado (formulario guardar) ──────
+  useEffect(() => {
+    if (!savingNinoId) { setSavingMetas([]); setSavingMetaId(''); return }
+    const sb = createClient()
+    sb.from('metas')
+      .select('id, titulo, area')
+      .eq('nino_id', savingNinoId)
+      .eq('estado', 'activa')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setSavingMetas(data || []))
+  }, [savingNinoId])
 
   // ── Búsqueda con debounce ────────────────────────────────────────────────
   useEffect(() => {
@@ -182,11 +208,18 @@ export default function PecsPage() {
       const res = await fetch('/api/pecs/sets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: savingName.trim(), nino_id: savingNinoId || null, pictogram_ids }),
+        body: JSON.stringify({
+          nombre: savingName.trim(),
+          nino_id: savingNinoId || null,
+          meta_id: savingMetaId || null,
+          pictogram_ids,
+        }),
       })
       if (res.ok) {
         setSavingName('')
         setSavingNinoId('')
+        setSavingMetaId('')
+        setSavingMetas([])
         setShowSaveForm(false)
         await fetchSavedSets()
       }
@@ -264,19 +297,19 @@ export default function PecsPage() {
           <div className="flex-1 overflow-auto p-4 space-y-4">
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 w-fit overflow-x-auto">
+            <div className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 w-full">
               {TABS.map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                  className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     activeTab === id
                       ? 'bg-primary-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {label}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="hidden sm:inline whitespace-nowrap">{label}</span>
                 </button>
               ))}
             </div>
@@ -334,7 +367,15 @@ export default function PecsPage() {
             {/* Tab: Sets guardados */}
             {activeTab === 'guardados' && (
               <div className="space-y-3">
-                {savedSets.length === 0 ? (
+                {setsError ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-red-400 gap-2">
+                    <p className="text-sm font-medium">Error al cargar sets</p>
+                    <p className="text-xs text-slate-400">{setsError}</p>
+                    <button onClick={fetchSavedSets} className="text-xs text-primary-600 underline mt-1">
+                      Reintentar
+                    </button>
+                  </div>
+                ) : savedSets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                     <BookmarkX className="w-12 h-12 mb-3 opacity-40" />
                     <p className="text-sm">No tienes sets guardados aún</p>
@@ -391,21 +432,28 @@ export default function PecsPage() {
 
           {/* Panel lateral de selección */}
           <div className="lg:w-80 shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-4 space-y-4 overflow-y-auto">
-            <h2 className="font-semibold text-slate-800 text-sm">
-              Pictogramas seleccionados
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-800 text-sm">Mi set</h2>
               {selected.length > 0 && (
-                <span className="ml-2 text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-bold">
-                  {selected.length}
+                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-bold">
+                  {selected.length} pictograma{selected.length !== 1 ? 's' : ''}
                 </span>
               )}
-            </h2>
+            </div>
 
             <SelectionTray
               selected={selected}
               onRemove={handleRemove}
               onClear={handleClear}
               onPrint={() => setShowPrintSettings(true)}
-              onSave={() => setShowSaveForm(true)}
+              onSave={() => {
+                setShowSaveForm(true)
+                // Pequeño delay para que el DOM monte el input antes de hacer focus
+                setTimeout(() => {
+                  saveInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  saveInputRef.current?.focus()
+                }, 80)
+              }}
               generating={generating}
             />
 
@@ -414,6 +462,7 @@ export default function PecsPage() {
               <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <p className="text-sm font-semibold text-slate-700">Guardar este set</p>
                 <Input
+                  ref={saveInputRef}
                   placeholder="Nombre del set (ej: Rutina mañana)"
                   value={savingName}
                   onChange={(e) => setSavingName(e.target.value)}
@@ -423,6 +472,14 @@ export default function PecsPage() {
                     <option value="">Sin asociar a un niño</option>
                     {ninos.map(n => (
                       <option key={n.id} value={n.id}>{n.nombre}</option>
+                    ))}
+                  </Select>
+                )}
+                {savingNinoId && savingMetas.length > 0 && (
+                  <Select value={savingMetaId} onChange={(e) => setSavingMetaId(e.target.value)}>
+                    <option value="">Sin vincular a una meta</option>
+                    {savingMetas.map(m => (
+                      <option key={m.id} value={m.id}>{m.titulo}</option>
                     ))}
                   </Select>
                 )}

@@ -7,7 +7,7 @@ import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
 import {
   Target, Plus, CheckCircle2, Clock, PauseCircle, XCircle,
-  Trash2, TrendingUp, ChevronRight, UserCheck, Lock, Pencil
+  Trash2, TrendingUp, ChevronRight, UserCheck, Lock, Pencil, LayoutGrid, Link2, Link2Off
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -338,12 +338,18 @@ function MetaCard({ meta, ninos, onSelect, onLograda }) {
 
 // ─── Modal detalle ────────────────────────────────────────────────────────────
 function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete }) {
-  const [progreso, setProgreso]   = useState(meta.progreso ?? 0)
-  const [nota, setNota]           = useState('')
-  const [actus, setActus]         = useState([])
-  const [loading, setLoading]     = useState(false)
-  const [loadingA, setLoadingA]   = useState(true)
-  const [editando, setEditando]   = useState(false)
+  const [progreso, setProgreso]       = useState(meta.progreso ?? 0)
+  const [nota, setNota]               = useState('')
+  const [actus, setActus]             = useState([])
+  const [loading, setLoading]         = useState(false)
+  const [loadingA, setLoadingA]       = useState(true)
+  const [editando, setEditando]       = useState(false)
+  // PECS
+  const [pecsAsociados, setPecsAsociados]   = useState([])
+  const [loadingPecs, setLoadingPecs]       = useState(true)
+  const [showVincular, setShowVincular]     = useState(false)
+  const [pecsSinMeta, setPecsSinMeta]       = useState([])
+  const [loadingVincular, setLoadingVincular] = useState(false)
 
   const nino   = ninos.find(n => n.id === meta.nino_id)
   const area   = AREA_MAP[meta.area] || AREA_MAP.regulacion
@@ -358,6 +364,7 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     fetchActus()
+    fetchPecsAsociados()
     const fn = e => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', fn)
     return () => { document.body.style.overflow = ''; document.removeEventListener('keydown', fn) }
@@ -390,6 +397,53 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
 
     setActus(actusConPerfil)
     setLoadingA(false)
+  }
+
+  const fetchPecsAsociados = async () => {
+    setLoadingPecs(true)
+    const sb = createClient()
+    const { data } = await sb
+      .from('pecs_sets')
+      .select('id, nombre, pictogram_ids, user_id')
+      .eq('meta_id', meta.id)
+      .order('created_at', { ascending: false })
+    setPecsAsociados(data || [])
+    setLoadingPecs(false)
+  }
+
+  const fetchPecsSinMeta = async () => {
+    const sb = createClient()
+    // Sin filtrar por user_id: la RLS controla qué sets ve cada usuario.
+    // Incluimos meta_id para filtrar en JS (tolerante si la columna aún no existe).
+    const { data: rows } = await sb
+      .from('pecs_sets')
+      .select('id, nombre, pictogram_ids, user_id, meta_id')
+      .eq('nino_id', meta.nino_id)
+      .order('created_at', { ascending: false })
+    // Filtrar en JS: sin meta asignada o columna aún no existe
+    const disponibles = (rows || []).filter(s => !s.meta_id)
+    setPecsSinMeta(disponibles)
+  }
+
+  const vincularSet = async (setId) => {
+    setLoadingVincular(true)
+    await fetch('/api/pecs/sets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: setId, meta_id: meta.id }),
+    })
+    await fetchPecsAsociados()
+    setPecsSinMeta(s => s.filter(p => p.id !== setId))
+    setLoadingVincular(false)
+  }
+
+  const desvincularSet = async (setId) => {
+    await fetch('/api/pecs/sets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: setId, meta_id: null }),
+    })
+    setPecsAsociados(s => s.filter(p => p.id !== setId))
   }
 
   const guardar = async () => {
@@ -520,6 +574,95 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
                   <span className="text-base">⚠️</span>
                   <p className="text-xs text-amber-700">Esta meta no tiene responsables asignados. Edítala para asignar uno.</p>
                 </div>
+              )}
+            </div>
+
+            {/* Material PECS asociado */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <LayoutGrid className="w-3.5 h-3.5" /> Material PECS
+              </p>
+
+              {loadingPecs ? (
+                <div className="flex justify-center py-3">
+                  <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+              ) : pecsAsociados.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl px-4 py-3 text-center">
+                  <p className="text-xs text-slate-400">Sin material PECS vinculado</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pecsAsociados.map(set => (
+                    <div key={set.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-2.5">
+                      <div className="flex gap-1 shrink-0">
+                        {(set.pictogram_ids || []).slice(0, 4).map((p, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={i} src={p.imageUrl} alt={p.label}
+                            className="w-8 h-8 rounded-lg object-contain border border-slate-100 bg-white" />
+                        ))}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{set.nombre}</p>
+                        <p className="text-xs text-slate-400">{(set.pictogram_ids || []).length} pictogramas</p>
+                      </div>
+                      {set.user_id === userId && (
+                        <button onClick={() => desvincularSet(set.id)}
+                          title="Desvincular"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
+                          <Link2Off className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Vincular set */}
+              {puedeEditar && (
+                showVincular ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-slate-500 font-medium">Tus sets disponibles para este niño:</p>
+                    {loadingVincular ? (
+                      <div className="flex justify-center py-2">
+                        <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                      </div>
+                    ) : pecsSinMeta.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-2">
+                        No tienes sets sin vincular para este niño
+                      </p>
+                    ) : pecsSinMeta.map(set => (
+                      <button key={set.id} onClick={() => vincularSet(set.id)}
+                        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2
+                                   hover:border-primary-300 hover:bg-primary-50 text-left transition-colors">
+                        <div className="flex gap-1 shrink-0">
+                          {(set.pictogram_ids || []).slice(0, 3).map((p, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={i} src={p.imageUrl} alt={p.label}
+                              className="w-7 h-7 rounded object-contain border border-slate-100 bg-white" />
+                          ))}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{set.nombre}</p>
+                          <p className="text-[10px] text-slate-400">{(set.pictogram_ids || []).length} pictogramas</p>
+                        </div>
+                        <Link2 className="w-4 h-4 text-primary-500 shrink-0" />
+                      </button>
+                    ))}
+                    <button onClick={() => setShowVincular(false)}
+                      className="text-xs text-slate-400 underline w-full text-center pt-1">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setShowVincular(true); fetchPecsSinMeta() }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2
+                               rounded-xl border border-dashed border-slate-300 text-xs text-slate-500
+                               hover:border-primary-400 hover:text-primary-600 transition-colors">
+                    <Link2 className="w-3.5 h-3.5" /> Vincular set PECS
+                  </button>
+                )
               )}
             </div>
 
@@ -655,10 +798,14 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
     nino_id: ninos.length === 1 ? ninos[0].id : '',
     area: '', titulo: '', descripcion: '', fecha_objetivo: '',
   })
-  // FIX: el creador queda como responsable por defecto desde el inicio
   const [responsables, setResponsables] = useState([userId])
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [error, setError]               = useState('')
+  // Paso 4 — PECS
+  const [metaCreada, setMetaCreada]     = useState(null)
+  const [pecsSets, setPecsSets]         = useState([])
+  const [loadingPecs, setLoadingPecs]   = useState(false)
+  const [vinculando, setVinculando]     = useState(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const areaSeleccionada = AREA_MAP[form.area]
@@ -682,7 +829,6 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
 
     if (err) { setError(err.message); setLoading(false); return }
 
-    // FIX: insertar responsables correctamente y esperar la respuesta
     if (responsables.length) {
       const { error: respErr } = await sb.from('metas_responsables').insert(
         responsables.map(uid => ({ meta_id: meta.id, usuario_id: uid }))
@@ -690,8 +836,19 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
       if (respErr) console.error('Error al insertar responsables:', respErr.message)
     }
 
-    onCreated()
-    onClose()
+    // Avanzar al paso 4 y cargar sets PECS disponibles
+    setMetaCreada(meta)
+    onCreated() // refrescar lista ya con la meta creada
+    setLoadingPecs(true)
+    const { data: setsData } = await sb
+      .from('pecs_sets')
+      .select('id, nombre, pictogram_ids, user_id, meta_id')
+      .eq('nino_id', form.nino_id)
+      .order('created_at', { ascending: false })
+    setPecsSets((setsData || []).filter(s => !s.meta_id))
+    setLoadingPecs(false)
+    setLoading(false)
+    setStep(4)
   }
 
   return (
@@ -713,7 +870,8 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
               <p className="text-xs text-slate-400">
                 {step === 1 ? 'Paso 1 · Área de desarrollo'
                   : step === 2 ? 'Paso 2 · Detalles de la meta'
-                  : 'Paso 3 · Responsables'}
+                  : step === 3 ? 'Paso 3 · Responsables'
+                  : 'Paso 4 · Material PECS (opcional)'}
               </p>
             </div>
           </div>
@@ -723,7 +881,7 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
         </div>
 
         <div className="flex gap-1.5 px-5 pt-3 pb-1">
-          {[1,2,3].map(s => (
+          {[1,2,3,4].map(s => (
             <div key={s} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step >= s ? 'bg-primary-500' : 'bg-slate-200'}`} />
           ))}
         </div>
@@ -825,6 +983,82 @@ function NuevaMetaModal({ ninos, equipo, userId, onClose, onCreated }) {
                 {loading ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Target className="w-4 h-4" />}
                 {loading ? 'Creando meta…' : 'Crear meta'}
               </Button>
+            </div>
+          )}
+
+          {/* Paso 4: Vincular PECS (opcional) */}
+          {step === 4 && (
+            <div className="space-y-4">
+              {/* Confirmación de meta creada */}
+              <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700">¡Meta creada!</p>
+                  <p className="text-xs text-emerald-600 mt-0.5 leading-snug">
+                    ¿Quieres vincularle un set de PECS para apoyar esta meta?
+                  </p>
+                </div>
+              </div>
+
+              {loadingPecs ? (
+                <div className="flex justify-center py-6">
+                  <span className="w-5 h-5 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+              ) : pecsSets.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl px-4 py-5 text-center space-y-1">
+                  <LayoutGrid className="w-7 h-7 text-slate-300 mx-auto" />
+                  <p className="text-sm text-slate-500 font-medium">Sin sets disponibles</p>
+                  <p className="text-xs text-slate-400 leading-snug">
+                    Crea un set en Material → PECS asignado a este niño y luego vincúlalo desde la meta.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Sets disponibles para este niño
+                  </p>
+                  {pecsSets.map(s => (
+                    <button
+                      key={s.id}
+                      disabled={!!vinculando}
+                      onClick={async () => {
+                        setVinculando(s.id)
+                        await fetch('/api/pecs/sets', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: s.id, meta_id: metaCreada.id }),
+                        })
+                        onClose()
+                      }}
+                      className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-3 py-2.5
+                                 hover:border-primary-300 hover:bg-primary-50 transition-colors disabled:opacity-60 text-left"
+                    >
+                      <div className="flex gap-1 shrink-0">
+                        {(s.pictogram_ids || []).slice(0, 4).map((p, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={i} src={p.imageUrl} alt={p.label}
+                            className="w-9 h-9 rounded-lg object-contain border border-slate-100 bg-white" />
+                        ))}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{s.nombre}</p>
+                        <p className="text-xs text-slate-400">{(s.pictogram_ids || []).length} pictogramas</p>
+                      </div>
+                      {vinculando === s.id
+                        ? <span className="w-4 h-4 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin shrink-0" />
+                        : <Link2 className="w-4 h-4 text-primary-400 shrink-0" />
+                      }
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={onClose}
+                className="w-full text-sm text-slate-400 hover:text-slate-600 py-2 transition-colors"
+              >
+                Omitir por ahora
+              </button>
             </div>
           )}
         </div>

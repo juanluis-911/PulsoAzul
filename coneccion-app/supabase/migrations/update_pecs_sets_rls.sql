@@ -7,6 +7,7 @@
 -- puedan ver los sets asociados a sus niños
 
 DROP POLICY IF EXISTS "Usuarios ven sus propios sets PECS" ON pecs_sets;
+DROP POLICY IF EXISTS "Usuarios ven sets PECS de sus niños" ON pecs_sets;
 
 CREATE POLICY "Usuarios ven sets PECS de sus niños"
   ON pecs_sets FOR SELECT
