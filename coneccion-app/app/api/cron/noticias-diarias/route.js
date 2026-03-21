@@ -79,9 +79,9 @@ export async function GET(request) {
 
     // Palabras que indican que la noticia NO es relevante
     const PALABRAS_EXCLUIDAS = [
-      /*'huelga', 'sindicato', 'protesta', 'manifestación', 'elecciones',
+      'huelga', 'sindicato', 'protesta', 'manifestación', 'elecciones',
       'partido', 'político', 'gobierno', 'deuda', 'presupuesto', 'fiscal',
-      'fútbol', 'deporte', 'economía', 'bolsa', 'mercado',*/
+      'fútbol', 'deporte', 'economía', 'bolsa', 'mercado',
     ]
 
     const articulos = (newsData.articles || []).filter((a) => {
