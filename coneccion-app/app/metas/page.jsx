@@ -350,6 +350,18 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
   const [showVincular, setShowVincular]     = useState(false)
   const [pecsSinMeta, setPecsSinMeta]       = useState([])
   const [loadingVincular, setLoadingVincular] = useState(false)
+  // Horarios Visuales
+  const [horariosAsociados, setHorariosAsociados]     = useState([])
+  const [loadingHorarios, setLoadingHorarios]         = useState(true)
+  const [showVincularHorario, setShowVincularHorario] = useState(false)
+  const [horariosSinMeta, setHorariosSinMeta]         = useState([])
+  const [loadingVincularH, setLoadingVincularH]       = useState(false)
+  // Historias Sociales
+  const [historiasAsociadas, setHistoriasAsociadas]     = useState([])
+  const [loadingHistorias, setLoadingHistorias]         = useState(true)
+  const [showVincularHistoria, setShowVincularHistoria] = useState(false)
+  const [historiasSinMeta, setHistoriasSinMeta]         = useState([])
+  const [loadingVincularHist, setLoadingVincularHist]   = useState(false)
 
   const nino   = ninos.find(n => n.id === meta.nino_id)
   const area   = AREA_MAP[meta.area] || AREA_MAP.regulacion
@@ -365,6 +377,8 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
     document.body.style.overflow = 'hidden'
     fetchActus()
     fetchPecsAsociados()
+    fetchHorariosAsociados()
+    fetchHistoriasAsociadas()
     const fn = e => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', fn)
     return () => { document.body.style.overflow = ''; document.removeEventListener('keydown', fn) }
@@ -444,6 +458,94 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
       body: JSON.stringify({ id: setId, meta_id: null }),
     })
     setPecsAsociados(s => s.filter(p => p.id !== setId))
+  }
+
+  // ── Horarios Visuales ───────────────────────────────────────────────────
+  const fetchHorariosAsociados = async () => {
+    setLoadingHorarios(true)
+    const sb = createClient()
+    const { data } = await sb
+      .from('horarios_visuales')
+      .select('id, nombre, actividades, user_id')
+      .eq('meta_id', meta.id)
+      .order('created_at', { ascending: false })
+    setHorariosAsociados(data || [])
+    setLoadingHorarios(false)
+  }
+
+  const fetchHorariosSinMeta = async () => {
+    const sb = createClient()
+    const { data: rows } = await sb
+      .from('horarios_visuales')
+      .select('id, nombre, actividades, user_id, meta_id')
+      .eq('nino_id', meta.nino_id)
+      .order('created_at', { ascending: false })
+    setHorariosSinMeta((rows || []).filter(h => !h.meta_id))
+  }
+
+  const vincularHorario = async (horarioId) => {
+    setLoadingVincularH(true)
+    await fetch('/api/horarios', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: horarioId, meta_id: meta.id }),
+    })
+    await fetchHorariosAsociados()
+    setHorariosSinMeta(h => h.filter(x => x.id !== horarioId))
+    setLoadingVincularH(false)
+  }
+
+  const desvincularHorario = async (horarioId) => {
+    await fetch('/api/horarios', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: horarioId, meta_id: null }),
+    })
+    setHorariosAsociados(h => h.filter(x => x.id !== horarioId))
+  }
+
+  // ── Historias Sociales ──────────────────────────────────────────────────
+  const fetchHistoriasAsociadas = async () => {
+    setLoadingHistorias(true)
+    const sb = createClient()
+    const { data } = await sb
+      .from('historias_sociales')
+      .select('id, titulo, paginas, user_id')
+      .eq('meta_id', meta.id)
+      .order('created_at', { ascending: false })
+    setHistoriasAsociadas(data || [])
+    setLoadingHistorias(false)
+  }
+
+  const fetchHistoriasSinMeta = async () => {
+    const sb = createClient()
+    const { data: rows } = await sb
+      .from('historias_sociales')
+      .select('id, titulo, paginas, user_id, meta_id')
+      .eq('nino_id', meta.nino_id)
+      .order('created_at', { ascending: false })
+    setHistoriasSinMeta((rows || []).filter(h => !h.meta_id))
+  }
+
+  const vincularHistoria = async (historiaId) => {
+    setLoadingVincularHist(true)
+    await fetch('/api/historias', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: historiaId, meta_id: meta.id }),
+    })
+    await fetchHistoriasAsociadas()
+    setHistoriasSinMeta(h => h.filter(x => x.id !== historiaId))
+    setLoadingVincularHist(false)
+  }
+
+  const desvincularHistoria = async (historiaId) => {
+    await fetch('/api/historias', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: historiaId, meta_id: null }),
+    })
+    setHistoriasAsociadas(h => h.filter(x => x.id !== historiaId))
   }
 
   const guardar = async () => {
@@ -661,6 +763,170 @@ function MetaModal({ meta, ninos, equipo, userId, onClose, onUpdate, onDelete })
                                rounded-xl border border-dashed border-slate-300 text-xs text-slate-500
                                hover:border-primary-400 hover:text-primary-600 transition-colors">
                     <Link2 className="w-3.5 h-3.5" /> Vincular set PECS
+                  </button>
+                )
+              )}
+            </div>
+
+            {/* Horarios Visuales asociados */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <LayoutGrid className="w-3.5 h-3.5" /> Horarios Visuales
+              </p>
+
+              {loadingHorarios ? (
+                <div className="flex justify-center py-3">
+                  <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+              ) : horariosAsociados.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl px-4 py-3 text-center">
+                  <p className="text-xs text-slate-400">Sin horarios visuales vinculados</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {horariosAsociados.map(horario => (
+                    <div key={horario.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-2.5">
+                      <div className="flex gap-1 shrink-0">
+                        {(horario.actividades || []).slice(0, 4).map((a, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={i} src={a.imageUrl} alt={a.label}
+                            className="w-8 h-8 rounded-lg object-contain border border-slate-100 bg-white" />
+                        ))}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{horario.nombre}</p>
+                        <p className="text-xs text-slate-400">{(horario.actividades || []).length} actividades</p>
+                      </div>
+                      {horario.user_id === userId && (
+                        <button onClick={() => desvincularHorario(horario.id)}
+                          title="Desvincular"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
+                          <Link2Off className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {puedeEditar && (
+                showVincularHorario ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-slate-500 font-medium">Tus horarios disponibles para este niño:</p>
+                    {loadingVincularH ? (
+                      <div className="flex justify-center py-2">
+                        <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                      </div>
+                    ) : horariosSinMeta.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-2">
+                        No tienes horarios sin vincular para este niño
+                      </p>
+                    ) : horariosSinMeta.map(horario => (
+                      <button key={horario.id} onClick={() => vincularHorario(horario.id)}
+                        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2
+                                   hover:border-primary-300 hover:bg-primary-50 text-left transition-colors">
+                        <div className="flex gap-1 shrink-0">
+                          {(horario.actividades || []).slice(0, 3).map((a, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={i} src={a.imageUrl} alt={a.label}
+                              className="w-7 h-7 rounded object-contain border border-slate-100 bg-white" />
+                          ))}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{horario.nombre}</p>
+                          <p className="text-[10px] text-slate-400">{(horario.actividades || []).length} actividades</p>
+                        </div>
+                        <Link2 className="w-4 h-4 text-primary-500 shrink-0" />
+                      </button>
+                    ))}
+                    <button onClick={() => setShowVincularHorario(false)}
+                      className="text-xs text-slate-400 underline w-full text-center pt-1">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setShowVincularHorario(true); fetchHorariosSinMeta() }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2
+                               rounded-xl border border-dashed border-slate-300 text-xs text-slate-500
+                               hover:border-primary-400 hover:text-primary-600 transition-colors">
+                    <Link2 className="w-3.5 h-3.5" /> Vincular horario visual
+                  </button>
+                )
+              )}
+            </div>
+
+            {/* Historias Sociales asociadas */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <LayoutGrid className="w-3.5 h-3.5" /> Historias Sociales
+              </p>
+
+              {loadingHistorias ? (
+                <div className="flex justify-center py-3">
+                  <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+              ) : historiasAsociadas.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl px-4 py-3 text-center">
+                  <p className="text-xs text-slate-400">Sin historias sociales vinculadas</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {historiasAsociadas.map(historia => (
+                    <div key={historia.id} className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-2.5">
+                      <span className="text-2xl shrink-0">📖</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{historia.titulo}</p>
+                        <p className="text-xs text-slate-400">{(historia.paginas || []).length} páginas</p>
+                      </div>
+                      {historia.user_id === userId && (
+                        <button onClick={() => desvincularHistoria(historia.id)}
+                          title="Desvincular"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0">
+                          <Link2Off className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {puedeEditar && (
+                showVincularHistoria ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-slate-500 font-medium">Tus historias disponibles para este niño:</p>
+                    {loadingVincularHist ? (
+                      <div className="flex justify-center py-2">
+                        <span className="w-4 h-4 border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+                      </div>
+                    ) : historiasSinMeta.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-2">
+                        No tienes historias sin vincular para este niño
+                      </p>
+                    ) : historiasSinMeta.map(historia => (
+                      <button key={historia.id} onClick={() => vincularHistoria(historia.id)}
+                        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2
+                                   hover:border-primary-300 hover:bg-primary-50 text-left transition-colors">
+                        <span className="text-xl shrink-0">📖</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{historia.titulo}</p>
+                          <p className="text-[10px] text-slate-400">{(historia.paginas || []).length} páginas</p>
+                        </div>
+                        <Link2 className="w-4 h-4 text-primary-500 shrink-0" />
+                      </button>
+                    ))}
+                    <button onClick={() => setShowVincularHistoria(false)}
+                      className="text-xs text-slate-400 underline w-full text-center pt-1">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setShowVincularHistoria(true); fetchHistoriasSinMeta() }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2
+                               rounded-xl border border-dashed border-slate-300 text-xs text-slate-500
+                               hover:border-primary-400 hover:text-primary-600 transition-colors">
+                    <Link2 className="w-3.5 h-3.5" /> Vincular historia social
                   </button>
                 )
               )}

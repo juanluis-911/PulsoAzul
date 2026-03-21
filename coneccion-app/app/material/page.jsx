@@ -15,7 +15,54 @@ const HERRAMIENTAS = [
     color: 'from-primary-50 to-primary-100 border-primary-200 hover:border-primary-400',
     iconColor: 'text-primary-600',
   },
-  // Aquí van las próximas herramientas
+  {
+    href: '/material/horarios-visuales',
+    icon: '📅',
+    titulo: 'Horarios Visuales',
+    descripcion: 'Crea secuencias visuales de actividades para rutinas diarias, terapias y jornadas escolares.',
+    color: 'from-emerald-50 to-emerald-100 border-emerald-200 hover:border-emerald-400',
+    iconColor: 'text-emerald-600',
+  },
+  {
+    href: '/material/primero-despues',
+    icon: '➡️',
+    titulo: 'Primero — Después',
+    descripcion: 'Tarjeta de dos pasos para comunicar secuencias simples. Herramienta básica de ABA.',
+    color: 'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
+    iconColor: 'text-blue-600',
+  },
+  {
+    href: '/material/economia-fichas',
+    icon: '⭐',
+    titulo: 'Economía de Fichas',
+    descripcion: 'Diseña tableros de refuerzo con tokens para motivar conductas positivas en terapia.',
+    color: 'from-amber-50 to-amber-100 border-amber-200 hover:border-amber-400',
+    iconColor: 'text-amber-600',
+  },
+  {
+    href: '/material/historias-sociales',
+    icon: '📖',
+    titulo: 'Historias Sociales',
+    descripcion: 'Crea narrativas visuales página por página para enseñar situaciones sociales.',
+    color: 'from-violet-50 to-violet-100 border-violet-200 hover:border-violet-400',
+    iconColor: 'text-violet-600',
+  },
+  {
+    href: '/material/tablero-emociones',
+    icon: '😊',
+    titulo: 'Tablero de Emociones',
+    descripcion: 'Genera tableros visuales de emociones para que el niño comunique cómo se siente.',
+    color: 'from-pink-50 to-pink-100 border-pink-200 hover:border-pink-400',
+    iconColor: 'text-pink-600',
+  },
+  {
+    href: '/material/tablero-elecciones',
+    icon: '🔲',
+    titulo: 'Tablero de Elecciones',
+    descripcion: 'Presenta 2 a 6 opciones visuales para que el niño elija sin usar lenguaje verbal.',
+    color: 'from-cyan-50 to-cyan-100 border-cyan-200 hover:border-cyan-400',
+    iconColor: 'text-cyan-600',
+  },
 ]
 
 export default function MaterialPage() {

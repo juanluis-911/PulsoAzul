@@ -7,7 +7,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(curl -X GET https://pulsoazul.com/api/cron/noticias-diarias -H \"Authorization: Bearer 974d004a812da5cdb6143db56697113ad0f9ccba2ea0a09234af8e87a15e035c\")"
+      "Bash(curl -X GET https://pulsoazul.com/api/cron/noticias-diarias -H \"Authorization: Bearer 974d004a812da5cdb6143db56697113ad0f9ccba2ea0a09234af8e87a15e035c\")",
+      "Bash(find C:PulsoAzulPulsoAzul -type f \\\\\\(-name *material* -o -name *pecs* \\\\\\))"
     ]
   }
 }

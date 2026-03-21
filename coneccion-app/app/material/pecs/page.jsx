@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 import { imageUrlToBase64, generarPECSPDF } from '@/lib/pecs-pdf'
 import { Zap, Search, LayoutGrid, Bookmark, BookmarkX, Trash2, ChevronLeft } from 'lucide-react'
+import { HelpModal } from '@/components/ui/HelpModal'
 import { Select } from '@/components/ui/Input'
 
 const TABS = [
@@ -285,7 +286,19 @@ export default function PecsPage() {
             <ChevronLeft className="w-3.5 h-3.5" />
             Material
           </Link>
-          <h1 className="text-xl font-bold">Generador de PECS</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold">Generador de PECS</h1>
+            <HelpModal
+              titulo="¿Cómo usar el Generador de PECS?"
+              pasos={[
+                'Elige una categoría o busca pictogramas por nombre.',
+                'Haz clic en los pictogramas para agregarlos a tu set.',
+                'Opcionalmente guarda el set vinculado a un niño o meta.',
+                'Pulsa "Imprimir / PDF" para configurar el tamaño y descargar la hoja.',
+              ]}
+              ejemplo="Mateo no habla, pero quiere jugar. Su maestra prepara un set PECS con pictogramas de actividades del recreo. Mateo señala el pictograma de 'pelota' y su maestra le da la pelota. Así practica comunicar deseos de forma independiente."
+            />
+          </div>
           <p className="text-primary-100 text-sm mt-0.5">
             Selecciona pictogramas y genera hojas imprimibles para comunicación aumentativa
           </p>
