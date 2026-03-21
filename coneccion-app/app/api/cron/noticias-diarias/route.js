@@ -79,13 +79,13 @@ export async function GET(request) {
 
     // Palabras que indican que la noticia NO es relevante
     const PALABRAS_EXCLUIDAS = [
-      'huelga', 'sindicato', 'protesta', 'manifestación', 'elecciones',
+      /*'huelga', 'sindicato', 'protesta', 'manifestación', 'elecciones',
       'partido', 'político', 'gobierno', 'deuda', 'presupuesto', 'fiscal',
-      'fútbol', 'deporte', 'economía', 'bolsa', 'mercado',
+      'fútbol', 'deporte', 'economía', 'bolsa', 'mercado',*/
     ]
 
     const articulos = (newsData.articles || []).filter((a) => {
-      if (!a.urlToImage || !a.title || a.title.includes('[Removed]')) return false
+      if (!a.title || a.title.includes('[Removed]')) return false
       if (urlsYaGuardadas.has(a.url)) return false
       const texto = `${a.title} ${a.description || ''}`.toLowerCase()
       return !PALABRAS_EXCLUIDAS.some((p) => texto.includes(p))
@@ -97,14 +97,16 @@ export async function GET(request) {
     console.log('[títulos disponibles]', (newsData.articles || []).map(a => ({ title: a.title, hasImage: !!a.urlToImage })))
 
     if (!articulos.length) {
-      return Response.json({ error: 'No se encontraron artículos con imagen' }, { status: 404 })
+      return Response.json({ error: 'No se encontraron artículos nuevos', totalRecibidos: newsData.articles?.length || 0 }, { status: 404 })
     }
 
     const articulo = articulos[0]
 
     // Descargar la imagen y subirla a Supabase Storage
-    let imagenUrl = articulo.urlToImage
+    const IMAGEN_DEFAULT = 'https://pulsoazul.com/pulsoazulDefaultNoticias.png'
+    let imagenUrl = articulo.urlToImage || IMAGEN_DEFAULT
     try {
+      if (!articulo.urlToImage) throw new Error('sin imagen original')
       const imgRes = await fetch(articulo.urlToImage)
       if (imgRes.ok) {
         const imgBuffer = await imgRes.arrayBuffer()
